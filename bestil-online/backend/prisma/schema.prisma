@@ -1,0 +1,292 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============= USERS =============
+enum UserRole {
+  CUSTOMER
+  RESTAURANT_OWNER
+  ADMIN
+  SUPER_ADMIN
+}
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  passwordHash   String
+  phone          String?
+  firstName      String
+  lastName       String
+  role           UserRole @default(CUSTOMER)
+  emailVerified  Boolean  @default(false)
+  isActive       Boolean  @default(true)
+  profilePicture String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  addresses        Address[]
+  orders           Order[]
+  reviews          Review[]
+  ownedRestaurants Restaurant[] @relation("RestaurantOwner")
+
+  @@index([email])
+  @@index([role])
+}
+
+model Address {
+  id         String   @id @default(uuid())
+  userId     String
+  label      String
+  street     String
+  city       String
+  postalCode String
+  country    String   @default("DK")
+  latitude   Float?
+  longitude  Float?
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@index([userId])
+}
+
+// ============= RESTAURANTS =============
+model Restaurant {
+  id                 String   @id @default(uuid())
+  ownerId            String
+  name               String
+  slug               String   @unique
+  description        String?
+  logoUrl            String?
+  bannerUrl          String?
+  phone              String
+  email              String
+  street             String
+  city               String
+  postalCode         String
+  country            String   @default("DK")
+  latitude           Float?
+  longitude          Float?
+  cuisines           String[]
+  openingHours       Json
+  isActive           Boolean  @default(false)
+  isVerified         Boolean  @default(false)
+  avgRating          Float    @default(0)
+  reviewCount        Int      @default(0)
+  deliveryTimeMin    Int      @default(30)
+  deliveryFee        Decimal  @default(0) @db.Decimal(10, 2)
+  minimumOrderAmount Decimal  @default(0) @db.Decimal(10, 2)
+  commissionRate     Decimal  @default(0.15) @db.Decimal(5, 4)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  owner      User           @relation("RestaurantOwner", fields: [ownerId], references: [id])
+  categories MenuCategory[]
+  menuItems  MenuItem[]
+  orders     Order[]
+  reviews    Review[]
+
+  @@index([slug])
+  @@index([isActive, isVerified])
+  @@index([city])
+}
+
+// ============= MENU =============
+model MenuCategory {
+  id           String   @id @default(uuid())
+  restaurantId String
+  name         String
+  description  String?
+  displayOrder Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  menuItems  MenuItem[]
+
+  @@index([restaurantId, displayOrder])
+}
+
+model MenuItem {
+  id                 String   @id @default(uuid())
+  restaurantId       String
+  categoryId         String
+  name               String
+  description        String?
+  price              Decimal  @db.Decimal(10, 2)
+  imageUrl           String?
+  isAvailable        Boolean  @default(true)
+  preparationTimeMin Int      @default(15)
+  isVegetarian       Boolean  @default(false)
+  isVegan            Boolean  @default(false)
+  allergens          String[]
+  displayOrder       Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  restaurant   Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  category     MenuCategory          @relation(fields: [categoryId], references: [id])
+  optionGroups MenuItemOptionGroup[]
+  orderItems   OrderItem[]
+
+  @@index([restaurantId, isAvailable])
+  @@index([categoryId])
+}
+
+model MenuItemOptionGroup {
+  id            String  @id @default(uuid())
+  menuItemId    String
+  name          String
+  isRequired    Boolean @default(false)
+  isMultiSelect Boolean @default(false)
+  displayOrder  Int     @default(0)
+
+  menuItem MenuItem         @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  options  MenuItemOption[]
+}
+
+model MenuItemOption {
+  id            String  @id @default(uuid())
+  optionGroupId String
+  name          String
+  priceModifier Decimal @default(0) @db.Decimal(10, 2)
+  displayOrder  Int     @default(0)
+
+  optionGroup MenuItemOptionGroup @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
+}
+
+// ============= ORDERS =============
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAYMENT_FAILED
+  PENDING_CONFIRMATION
+  CONFIRMED
+  PREPARING
+  READY_FOR_PICKUP
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+model Order {
+  id                  String      @id @default(uuid())
+  orderNumber         String      @unique
+  userId              String
+  restaurantId        String
+  deliveryAddressId   String
+  status              OrderStatus @default(PENDING_PAYMENT)
+  subtotal            Decimal     @db.Decimal(10, 2)
+  deliveryFee         Decimal     @db.Decimal(10, 2)
+  tax                 Decimal     @db.Decimal(10, 2)
+  discount            Decimal     @default(0) @db.Decimal(10, 2)
+  totalAmount         Decimal     @db.Decimal(10, 2)
+  platformCommission  Decimal     @db.Decimal(10, 2)
+  restaurantPayout    Decimal     @db.Decimal(10, 2)
+  specialInstructions String?
+  estimatedDeliveryAt DateTime?
+  confirmedAt         DateTime?
+  preparingAt         DateTime?
+  readyAt             DateTime?
+  deliveredAt         DateTime?
+  cancelledAt         DateTime?
+  cancellationReason  String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  user            User        @relation(fields: [userId], references: [id])
+  restaurant      Restaurant  @relation(fields: [restaurantId], references: [id])
+  deliveryAddress Address     @relation(fields: [deliveryAddressId], references: [id])
+  items           OrderItem[]
+  payment         Payment?
+  review          Review?
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([restaurantId, status])
+  @@index([orderNumber])
+  @@index([status])
+}
+
+model OrderItem {
+  id                  String   @id @default(uuid())
+  orderId             String
+  menuItemId          String
+  menuItemName        String
+  quantity            Int
+  unitPrice           Decimal  @db.Decimal(10, 2)
+  itemTotal           Decimal  @db.Decimal(10, 2)
+  selectedOptions     Json?
+  specialInstructions String?
+
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id])
+
+  @@index([orderId])
+}
+
+// ============= PAYMENTS =============
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentMethod {
+  CARD
+  WALLET
+  CASH_ON_DELIVERY
+}
+
+model Payment {
+  id                    String        @id @default(uuid())
+  orderId               String        @unique
+  amount                Decimal       @db.Decimal(10, 2)
+  currency              String        @default("DKK")
+  status                PaymentStatus @default(PENDING)
+  method                PaymentMethod
+  stripePaymentIntentId String?       @unique
+  stripeChargeId        String?
+  failureReason         String?
+  refundedAmount        Decimal?      @db.Decimal(10, 2)
+  createdAt             DateTime      @default(now())
+  completedAt           DateTime?
+  updatedAt             DateTime      @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([stripePaymentIntentId])
+  @@index([status])
+}
+
+// ============= REVIEWS (Phase 3) =============
+model Review {
+  id             String   @id @default(uuid())
+  orderId        String   @unique
+  userId         String
+  restaurantId   String
+  rating         Int
+  foodRating     Int?
+  deliveryRating Int?
+  comment        String?
+  isVisible      Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  order      Order      @relation(fields: [orderId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId, isVisible])
+}
