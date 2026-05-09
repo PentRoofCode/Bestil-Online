@@ -1,0 +1,75 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.pnp.*
+.yarn/
+
+# Build outputs
+dist/
+build/
+out/
+*.tsbuildinfo
+.next/
+.vite/
+
+# Environment files (NEVER commit secrets)
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+# Keep examples
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Testing
+coverage/
+*.lcov
+.nyc_output/
+test-results/
+playwright-report/
+
+# Caches
+.cache/
+.parcel-cache/
+.turbo/
+.eslintcache
+.stylelintcache
+.prettiercache
+
+# Editor / OS
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*.swn
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Prisma — keep schema and migrations, ignore generated artifacts
+backend/prisma/*.db
+backend/prisma/*.db-journal
+
+# Local Stripe webhook secret cache
+.stripe/
+
+# Misc
+.vercel
+.netlify
+*.tgz
+*.tar.gz
+.tmp/
+tmp/

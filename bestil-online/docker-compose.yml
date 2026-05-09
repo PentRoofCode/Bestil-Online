@@ -1,0 +1,51 @@
+# Local development infrastructure for Bestil Online.
+# Runs Postgres 16 and Redis 7 with persistent volumes.
+#
+# Usage:
+#   docker compose up -d        # Start
+#   docker compose down         # Stop (keep data)
+#   docker compose down -v      # Stop and wipe volumes (destructive)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bestil-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: bestil
+      POSTGRES_PASSWORD: bestil
+      POSTGRES_DB: bestil_dev
+      # Speed up local dev a touch — fine for dev, never for prod
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bestil -d bestil_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: bestil-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres_data:
+    name: bestil_postgres_data
+  redis_data:
+    name: bestil_redis_data
