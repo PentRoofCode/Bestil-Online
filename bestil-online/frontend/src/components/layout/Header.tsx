@@ -43,15 +43,20 @@ export default function Header() {
               <Link to="/orders" className="text-gray-600 hover:text-brand-500">
                 Mine ordrer
               </Link>
-              {(user.role === "RESTAURANT_OWNER") && (
+              {user.role === "RESTAURANT_OWNER" && (
                 <Link to="/restaurant/dashboard" className="text-gray-600 hover:text-brand-500">
                   Restaurant
                 </Link>
               )}
-              <div className="flex items-center gap-2 text-gray-600">
+              <Link to="/account" className="flex items-center gap-2 text-gray-600 hover:text-brand-500">
                 <User className="h-4 w-4" />
                 <span>{user.firstName}</span>
-              </div>
+              </Link>
+              {(user.role === "ADMIN" || user.role === "SUPER_ADMIN") && (
+                <Link to="/admin/dashboard" className="text-gray-600 hover:text-brand-500">
+                  Admin
+                </Link>
+              )}
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-1 text-gray-400 hover:text-red-500"

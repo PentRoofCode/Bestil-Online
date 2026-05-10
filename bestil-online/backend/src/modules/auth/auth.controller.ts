@@ -49,4 +49,26 @@ export const authController = {
     const user = await authService.me(req.user!.id);
     sendSuccess(res, user);
   }),
+
+  verifyEmail: asyncHandler(async (req: Request, res: Response) => {
+    const token = req.query.token as string | undefined;
+    if (!token) return res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Missing token" } });
+    await authService.verifyEmail(token);
+    sendSuccess(res, { verified: true });
+  }),
+
+  forgotPassword: asyncHandler(async (req: Request, res: Response) => {
+    await authService.forgotPassword(req.body);
+    sendSuccess(res, { sent: true });
+  }),
+
+  resetPassword: asyncHandler(async (req: Request, res: Response) => {
+    await authService.resetPassword(req.body);
+    sendSuccess(res, { reset: true });
+  }),
+
+  changePassword: asyncHandler(async (req: Request, res: Response) => {
+    await authService.changePassword(req.user!.id, req.body);
+    sendSuccess(res, null, 204);
+  }),
 };

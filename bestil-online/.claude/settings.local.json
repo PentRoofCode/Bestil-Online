@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:4000/api/v1/healthz)",
+      "Bash(curl *)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \"4000\")",
+      "PowerShell(Get-Process *)",
+      "Bash(npx tsx *)",
+      "PowerShell($logFile = \"$env:TEMP\\\\backend.log\"; Set-Location \"C:\\\\Users\\\\aaddb\\\\Downloads\\\\bestil-online-starter\\\\bestil-online\\\\backend\"; Start-Process -FilePath \"npx\" -ArgumentList \"tsx\",\"watch\",\"src/server.ts\" -WindowStyle Hidden -RedirectStandardOutput $logFile -RedirectStandardError \"$env:TEMP\\\\backend-err.log\"; Write-Output \"Backend started, log: $logFile\")",
+      "PowerShell($logFile = \"$env:TEMP\\\\backend.log\"; $errFile = \"$env:TEMP\\\\backend-err.log\"; Set-Location \"C:\\\\Users\\\\aaddb\\\\Downloads\\\\bestil-online-starter\\\\bestil-online\\\\backend\"; $psi = New-Object System.Diagnostics.ProcessStartInfo; $psi.FileName = \"node.exe\"; $psi.Arguments = \"$env:APPDATA\\\\npm\\\\node_modules\\\\npm\\\\bin\\\\npx-cli.js tsx watch src/server.ts\"; $psi.WorkingDirectory = \"C:\\\\Users\\\\aaddb\\\\Downloads\\\\bestil-online-starter\\\\bestil-online\\\\backend\"; $psi.UseShellExecute = $false; $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true; $p = [System.Diagnostics.Process]::Start\\($psi\\); Write-Output \"Started PID: $\\($p.Id\\)\")",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\aaddb\\\\Downloads\\\\bestil-online-starter\\\\bestil-online\" -Recurse | Where-Object { $_.Extension -match '\\\\.\\(ts|tsx\\)$' } | Select-Object -First 20 | ForEach-Object { $_.FullName })",
+      "Bash(pnpm --filter backend add nodemailer)",
+      "Bash(pnpm --filter backend add -D @types/nodemailer)",
+      "Bash(pnpm --filter frontend add recharts)"
+    ]
+  }
+}

@@ -24,6 +24,12 @@ const envSchema = z.object({
   DEFAULT_COMMISSION_RATE: z.coerce.number().default(0.15),
 
   FRONTEND_URL: z.string().url().default("http://localhost:5173"),
+
+  EMAIL_FROM: z.string().default("no-reply@bestil.online"),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

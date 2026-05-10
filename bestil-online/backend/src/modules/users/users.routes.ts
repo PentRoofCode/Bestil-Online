@@ -66,7 +66,33 @@ router.get(
   asyncHandler(async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id: req.user!.id },
-      select: { id: true, email: true, firstName: true, lastName: true, phone: true, role: true, profilePicture: true },
+      select: {
+        id: true, email: true, firstName: true, lastName: true,
+        phone: true, role: true, profilePicture: true, emailVerified: true,
+      },
+    });
+    sendSuccess(res, user);
+  }),
+);
+
+const updateProfileSchema = z.object({
+  firstName: z.string().min(1).max(100).optional(),
+  lastName: z.string().min(1).max(100).optional(),
+  phone: z.string().optional(),
+});
+
+router.patch(
+  "/me",
+  validate(updateProfileSchema),
+  asyncHandler(async (req, res) => {
+    const data = req.body as z.infer<typeof updateProfileSchema>;
+    const user = await prisma.user.update({
+      where: { id: req.user!.id },
+      data,
+      select: {
+        id: true, email: true, firstName: true, lastName: true,
+        phone: true, role: true, profilePicture: true, emailVerified: true,
+      },
     });
     sendSuccess(res, user);
   }),

@@ -5,7 +5,8 @@ import { prisma } from "@/config/db";
 import { redis } from "@/config/redis";
 import { env } from "@/config/env";
 import { ApiError } from "@/utils/ApiError";
-import type { RegisterBody, LoginBody } from "./auth.schemas";
+import { emailService } from "@/utils/email";
+import type { RegisterBody, LoginBody, ForgotPasswordBody, ResetPasswordBody, ChangePasswordBody } from "./auth.schemas";
 
 const BCRYPT_ROUNDS = 12;
 const REFRESH_TOKEN_BYTES = 40;
@@ -42,6 +43,12 @@ export const authService = {
       },
       select: { id: true, email: true, firstName: true, lastName: true, role: true },
     });
+
+    // Send verification email (non-blocking)
+    const verifyToken = randomBytes(32).toString("hex");
+    await redis.set(`emailverify:${verifyToken}`, user.id, "EX", 24 * 60 * 60);
+    emailService.sendVerification(user.email, verifyToken).catch(() => {});
+
     return user;
   },
 
@@ -90,6 +97,39 @@ export const authService = {
     const accessToken = makeAccessToken(user.id, user.email, user.role);
 
     return { accessToken, refreshToken: newRefreshToken };
+  },
+
+  async verifyEmail(token: string) {
+    const userId = await redis.get(`emailverify:${token}`);
+    if (!userId) throw new ApiError(400, "VALIDATION_ERROR", "Invalid or expired verification link");
+    await prisma.user.update({ where: { id: userId }, data: { emailVerified: true } });
+    await redis.del(`emailverify:${token}`);
+  },
+
+  async forgotPassword(data: ForgotPasswordBody) {
+    const user = await prisma.user.findUnique({ where: { email: data.email } });
+    if (!user) return; // don't reveal whether email exists
+    const token = randomBytes(32).toString("hex");
+    await redis.set(`pwreset:${token}`, user.id, "EX", 60 * 60);
+    emailService.sendPasswordReset(user.email, token).catch(() => {});
+  },
+
+  async resetPassword(data: ResetPasswordBody) {
+    const userId = await redis.get(`pwreset:${data.token}`);
+    if (!userId) throw new ApiError(400, "VALIDATION_ERROR", "Invalid or expired reset link");
+    const passwordHash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
+    await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+    await redis.del(`pwreset:${data.token}`);
+    // Invalidate all refresh tokens for user is best-effort (we don't index them by user)
+  },
+
+  async changePassword(userId: string, data: ChangePasswordBody) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw ApiError.notFound("User not found");
+    const valid = await bcrypt.compare(data.currentPassword, user.passwordHash);
+    if (!valid) throw new ApiError(401, "INVALID_CREDENTIALS", "Current password is incorrect");
+    const passwordHash = await bcrypt.hash(data.newPassword, BCRYPT_ROUNDS);
+    await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
   },
 
   async me(userId: string) {

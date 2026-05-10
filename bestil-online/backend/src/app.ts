@@ -12,6 +12,7 @@ import menusRoutes from "@/modules/menus/menus.routes";
 import ordersRoutes from "@/modules/orders/orders.routes";
 import paymentsRoutes from "@/modules/payments/payments.routes";
 import usersRoutes from "@/modules/users/users.routes";
+import adminRoutes from "@/modules/admin/admin.routes";
 import { ordersController } from "@/modules/orders/orders.controller";
 import { authenticate } from "@/middleware/auth.middleware";
 import { requireRole } from "@/middleware/role.middleware";
@@ -51,6 +52,7 @@ export function createApp() {
   app.use("/api/v1/orders", ordersRoutes);
   app.use("/api/v1/payments", paymentsRoutes);
   app.use("/api/v1/users", usersRoutes);
+  app.use("/api/v1/admin", adminRoutes);
 
   // Restaurant order queue
   app.get(

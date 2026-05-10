@@ -88,6 +88,11 @@ export default function LoginPage() {
             Opret konto
           </Link>
         </p>
+        <p className="mt-2 text-center text-sm text-gray-400">
+          <Link to="/forgot-password" className="hover:text-brand-500">
+            Glemt adgangskode?
+          </Link>
+        </p>
       </div>
     </div>
   );
