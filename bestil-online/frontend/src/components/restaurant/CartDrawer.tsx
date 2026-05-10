@@ -113,9 +113,10 @@ export default function CartDrawer({ open, onClose }: Props) {
               Gå til betaling
             </button>
             <button
-              onClick={clear}
-              className="mt-2 w-full rounded-xl py-2 text-xs text-gray-400 hover:text-gray-600"
+              onClick={() => { if (confirm("Ryd hele kurven?")) clear(); }}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-gray-200 py-2 text-xs text-gray-500 hover:border-red-200 hover:text-red-500 transition-colors"
             >
+              <Trash2 className="h-3.5 w-3.5" />
               Ryd kurv
             </button>
           </div>

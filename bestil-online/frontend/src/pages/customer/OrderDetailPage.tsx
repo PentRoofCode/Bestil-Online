@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, Clock, XCircle, Package, Truck, Star } from "lucide-react";
+import { CheckCircle, Clock, XCircle, Package, Truck, Star, ArrowLeft } from "lucide-react";
 import { ordersApi } from "@/api/orders.api";
 import { reviewsApi } from "@/api/reviews.api";
 
@@ -145,6 +145,13 @@ export default function OrderDetailPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+      <Link
+        to="/orders"
+        className="mb-6 flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Mine ordrer
+      </Link>
       <div className="mb-6">
         <p className="text-xs text-gray-400">{order.orderNumber}</p>
         <div className={`mt-1 flex items-center gap-2 text-lg font-semibold ${status.color}`}>

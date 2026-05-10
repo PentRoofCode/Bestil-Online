@@ -25,16 +25,16 @@ export default function OwnerLayout() {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden">
       <aside className="w-56 shrink-0 border-r border-gray-100 bg-white flex flex-col">
-        <div className="flex h-16 items-center gap-2 border-b border-gray-100 px-5">
+        <div className="flex h-16 shrink-0 items-center gap-2 border-b border-gray-100 px-5">
           <ShoppingCart className="h-5 w-5 text-brand-500" />
           <span className="font-bold text-gray-900 truncate">
             {current ? current.name : "Restaurant"}
           </span>
         </div>
 
-        <nav className="flex flex-col gap-0.5 p-3 flex-1">
+        <nav className="flex flex-col gap-0.5 p-3 flex-1 overflow-y-auto">
           {restaurantId ? (
             <>
               <Link
@@ -81,7 +81,7 @@ export default function OwnerLayout() {
           )}
         </nav>
 
-        <div className="border-t border-gray-100 p-3">
+        <div className="shrink-0 border-t border-gray-100 p-3">
           <button
             onClick={handleLogout}
             className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors"

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { MapPin } from "lucide-react";
+import { MapPin, ArrowLeft } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { addressesApi } from "@/api/addresses.api";
@@ -76,6 +76,13 @@ function Step1({ onProceed }: { onProceed: (s: Session) => void }) {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      <button
+        onClick={() => navigate(-1)}
+        className="mb-6 flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Tilbage
+      </button>
       <h1 className="mb-8 text-2xl font-bold text-gray-900">Betaling</h1>
 
       <div className="grid gap-8 lg:grid-cols-5">
@@ -192,13 +199,14 @@ function Step1({ onProceed }: { onProceed: (s: Session) => void }) {
 
 // ── Step 2: Payment methods ───────────────────────────────────────────────────
 
-function Step2({ orderId, total }: { orderId: string; total: number }) {
+function Step2({ orderId, total, onBack }: { orderId: string; total: number; onBack: () => void }) {
   const navigate = useNavigate();
   const stripe = useStripe();
   const elements = useElements();
   const { clear } = useCartStore();
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   async function handlePay() {
     if (!stripe || !elements) return;
@@ -223,8 +231,22 @@ function Step2({ orderId, total }: { orderId: string; total: number }) {
     navigate(`/orders/${orderId}`);
   }
 
+  async function handleBack() {
+    setCancelling(true);
+    try { await ordersApi.cancel(orderId, "Kunden gik tilbage fra betaling"); } catch { /* order may already be gone */ }
+    onBack();
+  }
+
   return (
     <div className="mx-auto max-w-lg px-4 py-10 sm:px-6">
+      <button
+        onClick={handleBack}
+        disabled={cancelling || isPending}
+        className="mb-6 flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors disabled:opacity-40"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        {cancelling ? "Annullerer..." : "Tilbage"}
+      </button>
       <h1 className="mb-6 text-2xl font-bold text-gray-900">Vælg betalingsmetode</h1>
       <div className="rounded-2xl border border-gray-100 bg-white p-6">
         <PaymentElement
@@ -277,7 +299,7 @@ export default function CheckoutPage() {
         },
       }}
     >
-      <Step2 orderId={session.orderId} total={session.total} />
+      <Step2 orderId={session.orderId} total={session.total} onBack={() => setSession(null)} />
     </Elements>
   );
 }
