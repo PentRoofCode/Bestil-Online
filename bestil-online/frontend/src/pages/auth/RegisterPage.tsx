@@ -1,9 +1,10 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
-import { ShoppingBag } from "lucide-react";
+import { ShoppingBag, Eye, EyeOff } from "lucide-react";
 import { authApi } from "@/api/auth.api";
 import { useAuthStore } from "@/stores/authStore";
 
@@ -20,6 +21,7 @@ type FormData = z.infer<typeof schema>;
 export default function RegisterPage() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -87,11 +89,21 @@ export default function RegisterPage() {
 
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Adgangskode</label>
-              <input
-                type="password"
-                {...register("password")}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand-400 focus:outline-none"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  {...register("password")}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 pr-10 text-sm focus:border-brand-400 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               {errors.password && <p className="mt-1 text-xs text-red-500">{errors.password.message}</p>}
             </div>
 

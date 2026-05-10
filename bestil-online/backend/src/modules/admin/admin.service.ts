@@ -1,11 +1,13 @@
 import { Prisma, OrderStatus } from "@prisma/client";
 import { prisma } from "@/config/db";
 import { ApiError } from "@/utils/ApiError";
+import { recomputeRestaurantRating } from "@/modules/reviews/reviews.service";
 import type {
   ListRestaurantsAdminQuery,
   ListOrdersAdminQuery,
   ListUsersAdminQuery,
   RevenueReportQuery,
+  ListReviewsAdminQuery,
 } from "./admin.schemas";
 
 export const adminService = {
@@ -83,13 +85,25 @@ export const adminService = {
     return prisma.restaurant.update({ where: { id }, data: { isVerified: true, isActive: true } });
   },
 
-  async suspendRestaurant(id: string, reason: string) {
+  async suspendRestaurant(id: string, reason?: string) {
     const restaurant = await prisma.restaurant.findUnique({ where: { id } });
     if (!restaurant) throw ApiError.notFound("Restaurant not found");
+    const note = reason?.trim() ? ` [Suspended: ${reason.trim()}]` : "";
     return prisma.restaurant.update({
       where: { id },
-      data: { isActive: false, description: restaurant.description ? `${restaurant.description} [Suspended: ${reason}]` : `[Suspended: ${reason}]` },
+      data: {
+        isActive: false,
+        description: restaurant.description
+          ? `${restaurant.description}${note}`
+          : note || null,
+      },
     });
+  },
+
+  async reactivateRestaurant(id: string) {
+    const restaurant = await prisma.restaurant.findUnique({ where: { id } });
+    if (!restaurant) throw ApiError.notFound("Restaurant not found");
+    return prisma.restaurant.update({ where: { id }, data: { isActive: true } });
   },
 
   async listOrders(query: ListOrdersAdminQuery) {
@@ -156,30 +170,67 @@ export const adminService = {
     return prisma.user.update({ where: { id }, data: { isActive }, select: { id: true, isActive: true } });
   },
 
+  async listReviews(query: ListReviewsAdminQuery) {
+    const { page, limit, restaurantId, isVisible } = query;
+    const skip = (page - 1) * limit;
+    const where = {
+      ...(restaurantId && { restaurantId }),
+      ...(isVisible !== undefined && { isVisible }),
+    };
+    const [data, total] = await Promise.all([
+      prisma.review.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+        include: {
+          user: { select: { firstName: true, lastName: true, email: true } },
+          restaurant: { select: { name: true } },
+        },
+      }),
+      prisma.review.count({ where }),
+    ]);
+    return { data, meta: { pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } } };
+  },
+
+  async setReviewVisibility(id: string, isVisible: boolean) {
+    const review = await prisma.review.findUnique({ where: { id } });
+    if (!review) throw ApiError.notFound("Review not found");
+
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.review.update({ where: { id }, data: { isVisible } });
+      type TxClient = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
+      await recomputeRestaurantRating(tx as TxClient, review.restaurantId);
+      return updated;
+    });
+  },
+
   async revenueReport(query: RevenueReportQuery) {
     const { from, to, groupBy } = query;
     const fromDate = new Date(from);
     const toDate = new Date(to);
 
-    type Row = { period: Date; revenue: number; orders: bigint };
+    type Row = { period: string; revenue: number; orders: bigint };
 
-    let format: string;
-    if (groupBy === "day") format = "YYYY-MM-DD";
-    else if (groupBy === "week") format = "IYYY-IW";
-    else format = "YYYY-MM";
+    // groupBy is validated by Zod enum so Prisma.raw is safe here
+    // Single quotes are required so PostgreSQL treats it as a string literal, not a column name
+    const unit = Prisma.raw(`'${groupBy}'`);
+    const format = groupBy === "day" ? "YYYY-MM-DD" : groupBy === "week" ? "IYYY-IW" : "YYYY-MM";
 
-    const rows = await prisma.$queryRaw<Row[]>`
-      SELECT
-        TO_CHAR(DATE_TRUNC(${groupBy}, "createdAt"), ${format}) AS period,
-        SUM("totalAmount")::float AS revenue,
-        COUNT(*) AS orders
-      FROM "Order"
-      WHERE "createdAt" >= ${fromDate}
-        AND "createdAt" <= ${toDate}
-        AND status NOT IN ('CANCELLED','PAYMENT_FAILED','REFUNDED')
-      GROUP BY DATE_TRUNC(${groupBy}, "createdAt")
-      ORDER BY DATE_TRUNC(${groupBy}, "createdAt") ASC
-    `;
+    const rows = await prisma.$queryRaw<Row[]>(
+      Prisma.sql`
+        SELECT
+          TO_CHAR(DATE_TRUNC(${unit}, "createdAt"), ${format}) AS period,
+          COALESCE(SUM("totalAmount")::float, 0) AS revenue,
+          COUNT(*) AS orders
+        FROM "Order"
+        WHERE "createdAt" >= ${fromDate}
+          AND "createdAt" <= ${toDate}
+          AND status NOT IN ('CANCELLED','PAYMENT_FAILED','REFUNDED')
+        GROUP BY DATE_TRUNC(${unit}, "createdAt")
+        ORDER BY DATE_TRUNC(${unit}, "createdAt") ASC
+      `,
+    );
 
     return rows.map((r) => ({ period: r.period, revenue: r.revenue ?? 0, orders: Number(r.orders) }));
   },

@@ -11,7 +11,7 @@ const stripe = new Stripe(env.STRIPE_SECRET_KEY, { apiVersion: "2025-02-24.acaci
 
 // Allowed status transitions
 const TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
-  PENDING_PAYMENT: ["PAYMENT_FAILED", "PENDING_CONFIRMATION"],
+  PENDING_PAYMENT: ["PAYMENT_FAILED", "PENDING_CONFIRMATION", "CANCELLED"],
   PENDING_CONFIRMATION: ["CONFIRMED", "CANCELLED"],
   CONFIRMED: ["PREPARING", "CANCELLED"],
   PREPARING: ["READY_FOR_PICKUP", "CANCELLED"],
@@ -226,6 +226,8 @@ export const ordersService = {
       throw new ApiError(409, "CONFLICT", `Cannot cancel order in status ${order.status}`);
     }
 
+    let finalStatus: "CANCELLED" | "REFUNDED" = "CANCELLED";
+
     await prisma.$transaction(async (tx) => {
       await tx.order.update({
         where: { id },
@@ -240,8 +242,11 @@ export const ordersService = {
           data: { status: "REFUNDED", refundedAmount: order.payment.amount },
         });
         await tx.order.update({ where: { id }, data: { status: "REFUNDED" } });
+        finalStatus = "REFUNDED";
       }
     });
+
+    return prisma.order.findUnique({ where: { id } });
   },
 
   async listByRestaurant(restaurantId: string, userId: string, userRole: string, query: ListOrdersQuery) {

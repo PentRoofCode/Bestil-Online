@@ -24,12 +24,17 @@ export default function RestaurantsAdminPage() {
   });
 
   const { mutate: suspend, isPending: suspending } = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) => adminApi.suspendRestaurant(id, reason),
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) => adminApi.suspendRestaurant(id, reason),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "restaurants"] });
       setSuspendModal(null);
       setSuspendReason("");
     },
+  });
+
+  const { mutate: reactivate } = useMutation({
+    mutationFn: (id: string) => adminApi.reactivateRestaurant(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "restaurants"] }),
   });
 
   return (
@@ -103,6 +108,14 @@ export default function RestaurantsAdminPage() {
                           Godkend
                         </button>
                       )}
+                      {r.isVerified && !r.isActive && (
+                        <button
+                          onClick={() => reactivate(r.id)}
+                          className="rounded-lg bg-green-500 px-3 py-1 text-xs font-semibold text-white hover:bg-green-600"
+                        >
+                          Genaktiver
+                        </button>
+                      )}
                       {r.isActive && (
                         <button
                           onClick={() => setSuspendModal({ id: r.id, name: r.name })}
@@ -124,13 +137,13 @@ export default function RestaurantsAdminPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6">
             <h3 className="mb-2 font-semibold text-gray-900">Suspender {suspendModal.name}</h3>
-            <p className="mb-4 text-sm text-gray-500">Angiv årsagen til suspension:</p>
+            <p className="mb-4 text-sm text-gray-500">Årsag (valgfrit):</p>
             <textarea
               value={suspendReason}
               onChange={(e) => setSuspendReason(e.target.value)}
               rows={3}
               className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none"
-              placeholder="Årsag..."
+              placeholder="Angiv årsag til suspension..."
             />
             <div className="mt-4 flex gap-3">
               <button
@@ -140,8 +153,8 @@ export default function RestaurantsAdminPage() {
                 Annuller
               </button>
               <button
-                onClick={() => suspend({ id: suspendModal.id, reason: suspendReason })}
-                disabled={suspending || !suspendReason.trim()}
+                onClick={() => suspend({ id: suspendModal.id, reason: suspendReason || undefined })}
+                disabled={suspending}
                 className="flex-1 rounded-lg bg-red-500 py-2 text-sm font-semibold text-white disabled:opacity-60"
               >
                 {suspending ? "Suspenderer..." : "Suspender"}

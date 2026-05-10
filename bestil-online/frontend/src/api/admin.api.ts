@@ -62,8 +62,10 @@ export const adminApi = {
 
   verifyRestaurant: (id: string) => apiClient.post(`/admin/restaurants/${id}/verify`),
 
-  suspendRestaurant: (id: string, reason: string) =>
+  suspendRestaurant: (id: string, reason?: string) =>
     apiClient.post(`/admin/restaurants/${id}/suspend`, { reason }),
+
+  reactivateRestaurant: (id: string) => apiClient.post(`/admin/restaurants/${id}/reactivate`),
 
   listOrders: (params?: Record<string, string | number>) =>
     apiClient.get<ApiResponse<AdminOrder[]>>("/admin/orders", { params }),

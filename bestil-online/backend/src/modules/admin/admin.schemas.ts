@@ -7,7 +7,7 @@ export const listRestaurantsAdminSchema = z.object({
 });
 
 export const suspendRestaurantSchema = z.object({
-  reason: z.string().min(1),
+  reason: z.string().optional(),
 });
 
 export const listOrdersAdminSchema = z.object({
@@ -33,6 +33,19 @@ export const revenueReportSchema = z.object({
   groupBy: z.enum(["day", "week", "month"]).default("day"),
 });
 
+export const listReviewsAdminSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  restaurantId: z.string().optional(),
+  isVisible: z.coerce.boolean().optional(),
+});
+
+export const updateReviewVisibilitySchema = z.object({
+  isVisible: z.boolean(),
+});
+
+export type ListReviewsAdminQuery = z.infer<typeof listReviewsAdminSchema>;
+export type UpdateReviewVisibilityBody = z.infer<typeof updateReviewVisibilitySchema>;
 export type ListRestaurantsAdminQuery = z.infer<typeof listRestaurantsAdminSchema>;
 export type SuspendRestaurantBody = z.infer<typeof suspendRestaurantSchema>;
 export type ListOrdersAdminQuery = z.infer<typeof listOrdersAdminSchema>;

@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Star, Clock, Bike, ShoppingCart, Plus } from "lucide-react";
 import { restaurantsApi } from "@/api/restaurants.api";
+import { reviewsApi } from "@/api/reviews.api";
 import { useCartStore } from "@/stores/cartStore";
 import CartDrawer from "@/components/restaurant/CartDrawer";
 import type { MenuItem, MenuOptionGroup } from "@/api/restaurants.api";
@@ -158,6 +159,47 @@ function ItemModal({
   );
 }
 
+function ReviewsSection({ restaurantId }: { restaurantId: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["restaurantReviews", restaurantId],
+    queryFn: () => reviewsApi.listByRestaurant(restaurantId, { limit: 5 }),
+  });
+
+  const reviews = data?.data?.data ?? [];
+
+  if (isLoading) return <p className="text-sm text-gray-400">Indlæser anmeldelser...</p>;
+  if (reviews.length === 0) return <p className="text-sm text-gray-400">Ingen anmeldelser endnu.</p>;
+
+  return (
+    <div className="flex flex-col gap-4">
+      {reviews.map((r) => (
+        <div key={r.id} className="rounded-2xl border border-gray-100 p-5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star
+                  key={i}
+                  className={`h-4 w-4 ${i < r.rating ? "fill-yellow-400 text-yellow-400" : "fill-transparent text-gray-200"}`}
+                />
+              ))}
+            </div>
+            <span className="text-xs text-gray-400">
+              {r.user.firstName} · {new Date(r.createdAt).toLocaleDateString("da-DK")}
+            </span>
+          </div>
+          {r.comment && <p className="mt-2 text-sm text-gray-600">{r.comment}</p>}
+          {(r.foodRating || r.deliveryRating) && (
+            <div className="mt-2 flex gap-4 text-xs text-gray-400">
+              {r.foodRating && <span>Mad: {r.foodRating}/5</span>}
+              {r.deliveryRating && <span>Levering: {r.deliveryRating}/5</span>}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function RestaurantPage() {
   const { slug } = useParams<{ slug: string }>();
   const [cartOpen, setCartOpen] = useState(false);
@@ -216,7 +258,7 @@ export default function RestaurantPage() {
         </div>
 
         {/* Menu */}
-        <div className="pb-20">
+        <div className="pb-6">
           {restaurant.categories.map((cat) => (
             <div key={cat.id} className="mb-10">
               <h2 className="mb-4 text-lg font-bold text-gray-900">{cat.name}</h2>
@@ -254,6 +296,16 @@ export default function RestaurantPage() {
             </div>
           ))}
         </div>
+
+        {/* Reviews */}
+        {restaurant.reviewCount > 0 && (
+          <div className="mb-20">
+            <h2 className="mb-4 text-lg font-bold text-gray-900">
+              Anmeldelser ({restaurant.reviewCount})
+            </h2>
+            <ReviewsSection restaurantId={restaurant.id} />
+          </div>
+        )}
       </div>
 
       {selectedItem && (

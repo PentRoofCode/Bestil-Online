@@ -23,5 +23,5 @@ export const usersApi = {
     apiClient.patch<ApiResponse<UserProfile>>("/users/me", data),
 
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
-    apiClient.post("/auth/change-password", data),
+    apiClient.post("/users/me/change-password", data),
 };

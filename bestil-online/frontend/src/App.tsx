@@ -27,32 +27,27 @@ import RestaurantsAdminPage from "@/pages/admin/RestaurantsAdminPage";
 import OrdersAdminPage from "@/pages/admin/OrdersAdminPage";
 import UsersAdminPage from "@/pages/admin/UsersAdminPage";
 import ReportsPage from "@/pages/admin/ReportsPage";
+import ReviewsModerationPage from "@/pages/admin/ReviewsModerationPage";
 
 export default function App() {
   const setAuth = useAuthStore((s) => s.setAuth);
+  const setHydrated = useAuthStore((s) => s.setHydrated);
 
   useEffect(() => {
     authApi
-      .me()
-      .then((res) => {
-        const token = useAuthStore.getState().accessToken;
-        if (token) setAuth(res.data.data, token);
+      .refresh()
+      .then((r) => {
+        const accessToken = r.data.data.accessToken;
+        useAuthStore.getState().setAccessToken(accessToken);
+        return authApi.me();
       })
-      .catch(() => {
-        authApi
-          .refresh()
-          .then((r) => {
-            const accessToken = r.data.data.accessToken;
-            useAuthStore.getState().setAccessToken(accessToken);
-            return authApi.me();
-          })
-          .then((r) => {
-            const token = useAuthStore.getState().accessToken;
-            if (token) setAuth(r.data.data, token);
-          })
-          .catch(() => {});
-      });
-  }, [setAuth]);
+      .then((r) => {
+        const token = useAuthStore.getState().accessToken;
+        if (token) setAuth(r.data.data, token);
+      })
+      .catch(() => {})
+      .finally(() => setHydrated());
+  }, [setAuth, setHydrated]);
 
   return (
     <BrowserRouter>
@@ -104,6 +99,7 @@ export default function App() {
           <Route path="orders" element={<OrdersAdminPage />} />
           <Route path="users" element={<UsersAdminPage />} />
           <Route path="reports" element={<ReportsPage />} />
+          <Route path="reviews" element={<ReviewsModerationPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

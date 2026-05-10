@@ -7,7 +7,7 @@ const selectedOptionSchema = z.object({
 });
 
 const orderItemSchema = z.object({
-  menuItemId: z.string().uuid(),
+  menuItemId: z.string().min(1),
   quantity: z.number().int().min(1),
   selectedOptions: z.array(selectedOptionSchema).optional().default([]),
   specialInstructions: z.string().max(500).optional(),
@@ -22,6 +22,7 @@ export const createOrderSchema = z.object({
 
 export const updateStatusSchema = z.object({
   status: z.enum([
+    "PENDING_CONFIRMATION",
     "CONFIRMED",
     "PREPARING",
     "READY_FOR_PICKUP",

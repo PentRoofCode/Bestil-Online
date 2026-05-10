@@ -30,8 +30,8 @@ export const ordersController = {
   }),
 
   cancel: asyncHandler(async (req: Request, res: Response) => {
-    await ordersService.cancel(req.params.id as string, req.user!.id, req.user!.role, req.body?.reason);
-    sendSuccess(res, null, 204);
+    const order = await ordersService.cancel(req.params.id as string, req.user!.id, req.user!.role, req.body?.reason);
+    sendSuccess(res, order);
   }),
 
   listByRestaurant: asyncHandler(async (req: Request, res: Response) => {

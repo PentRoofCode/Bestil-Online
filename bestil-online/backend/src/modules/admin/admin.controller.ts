@@ -20,7 +20,12 @@ export const adminController = {
   }),
 
   suspendRestaurant: asyncHandler(async (req: Request, res: Response) => {
-    const restaurant = await adminService.suspendRestaurant(req.params.id as string, req.body.reason as string);
+    const restaurant = await adminService.suspendRestaurant(req.params.id as string, req.body.reason as string | undefined);
+    sendSuccess(res, restaurant);
+  }),
+
+  reactivateRestaurant: asyncHandler(async (req: Request, res: Response) => {
+    const restaurant = await adminService.reactivateRestaurant(req.params.id as string);
     sendSuccess(res, restaurant);
   }),
 
@@ -49,5 +54,18 @@ export const adminController = {
   revenueReport: asyncHandler(async (req: Request, res: Response) => {
     const rows = await adminService.revenueReport(req.query as never);
     sendSuccess(res, rows);
+  }),
+
+  listReviews: asyncHandler(async (req: Request, res: Response) => {
+    const result = await adminService.listReviews(req.query as never);
+    sendSuccess(res, result.data, 200, result.meta);
+  }),
+
+  setReviewVisibility: asyncHandler(async (req: Request, res: Response) => {
+    const review = await adminService.setReviewVisibility(
+      req.params.id as string,
+      req.body.isVisible as boolean,
+    );
+    sendSuccess(res, review);
   }),
 };

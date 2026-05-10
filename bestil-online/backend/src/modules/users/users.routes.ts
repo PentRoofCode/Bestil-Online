@@ -1,8 +1,10 @@
 import { Router } from "express";
+import bcrypt from "bcrypt";
 import { prisma } from "@/config/db";
 import { asyncHandler } from "@/utils/asyncHandler";
 import { sendSuccess, sendCreated } from "@/utils/ApiResponse";
 import { authenticate } from "@/middleware/auth.middleware";
+import { ApiError } from "@/utils/ApiError";
 import { z } from "zod";
 import { validate } from "@/middleware/validate.middleware";
 
@@ -57,7 +59,27 @@ router.delete(
   "/me/addresses/:id",
   asyncHandler(async (req, res) => {
     await prisma.address.deleteMany({ where: { id: req.params.id as string, userId: req.user!.id } });
-    sendSuccess(res, null, 204);
+    sendSuccess(res, null);
+  }),
+);
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8),
+});
+
+router.post(
+  "/me/change-password",
+  validate(changePasswordSchema),
+  asyncHandler(async (req, res) => {
+    const { currentPassword, newPassword } = req.body as z.infer<typeof changePasswordSchema>;
+    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    if (!user) throw ApiError.notFound("User not found");
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) throw new ApiError(401, "INVALID_CREDENTIALS", "Current password is incorrect");
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({ where: { id: req.user!.id }, data: { passwordHash } });
+    sendSuccess(res, null);
   }),
 );
 

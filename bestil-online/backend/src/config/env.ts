@@ -25,6 +25,8 @@ const envSchema = z.object({
 
   FRONTEND_URL: z.string().url().default("http://localhost:5173"),
 
+  API_KEY: z.string().min(16).optional(),
+
   EMAIL_FROM: z.string().default("no-reply@bestil.online"),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().optional(),

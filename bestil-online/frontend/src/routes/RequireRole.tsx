@@ -10,6 +10,8 @@ interface Props {
 
 export default function RequireRole({ roles, children }: Props) {
   const user = useAuthStore((s) => s.user);
+  const isHydrating = useAuthStore((s) => s.isHydrating);
+  if (isHydrating) return null;
   if (!user) return <Navigate to="/login" replace />;
   if (!roles.includes(user.role)) return <Navigate to="/" replace />;
   return <>{children}</>;
