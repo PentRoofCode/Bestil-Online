@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Star, Clock, Bike, ShoppingCart, Plus } from "lucide-react";
@@ -27,6 +27,20 @@ function ItemModal({
   const [qty, setQty] = useState(1);
   const [selections, setSelections] = useState<Record<string, string | string[]>>({});
   const [confirmSwitch, setConfirmSwitch] = useState(false);
+
+  const optionsTotal = useMemo(() => {
+    let total = 0;
+    for (const group of item.optionGroups) {
+      const sel = selections[group.id];
+      if (!sel || (Array.isArray(sel) && sel.length === 0)) continue;
+      const names = Array.isArray(sel) ? sel : [sel];
+      for (const name of names) {
+        const opt = group.options.find((o) => o.name === name);
+        if (opt) total += Number(opt.priceModifier);
+      }
+    }
+    return total;
+  }, [selections, item.optionGroups]);
 
   function toggleOption(group: MenuOptionGroup, optionName: string) {
     setSelections((prev) => {
@@ -150,7 +164,7 @@ function ItemModal({
               onClick={handleAdd}
               className="rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
             >
-              Tilføj — {(Number(item.price) * qty).toFixed(0)} kr
+              Tilføj — {((Number(item.price) + optionsTotal) * qty).toFixed(0)} kr
             </button>
           </div>
         </div>

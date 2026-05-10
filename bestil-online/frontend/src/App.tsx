@@ -79,9 +79,12 @@ export default function App() {
         >
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<OwnerDashboardPage />} />
-          <Route path="menu" element={<MenuManagerPage />} />
-          <Route path="orders" element={<OrderQueuePage />} />
-          <Route path="settings" element={<div className="text-gray-400">Indstillinger (kommer snart)</div>} />
+          <Route path=":restaurantId">
+            <Route index element={<Navigate to="menu" replace />} />
+            <Route path="menu" element={<MenuManagerPage />} />
+            <Route path="orders" element={<OrderQueuePage />} />
+            <Route path="settings" element={<div className="text-gray-400">Indstillinger (kommer snart)</div>} />
+          </Route>
         </Route>
 
         {/* Admin routes */}

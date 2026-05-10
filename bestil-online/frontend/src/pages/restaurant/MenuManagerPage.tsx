@@ -1,22 +1,26 @@
 import { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Copy } from "lucide-react";
 import { restaurantsApi } from "@/api/restaurants.api";
 import { menusApi } from "@/api/menus.api";
-import { useAuthStore } from "@/stores/authStore";
 import { apiClient } from "@/api/client";
+
+interface MenuItemData {
+  id: string;
+  name: string;
+  description: string | null;
+  price: string;
+  isAvailable: boolean;
+  isVegetarian: boolean;
+  isVegan: boolean;
+}
 
 interface Category {
   id: string;
   name: string;
-  menuItems: {
-    id: string;
-    name: string;
-    description: string | null;
-    price: string;
-    isAvailable: boolean;
-    isVegetarian: boolean;
-  }[];
+  description: string | null;
+  menuItems: MenuItemData[];
 }
 
 function CategoryModal({
@@ -57,10 +61,7 @@ function CategoryModal({
           autoFocus
         />
         <div className="mt-4 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-lg border border-gray-200 py-2 text-sm text-gray-600"
-          >
+          <button onClick={onClose} className="flex-1 rounded-lg border border-gray-200 py-2 text-sm text-gray-600">
             Annuller
           </button>
           <button
@@ -127,9 +128,7 @@ function ItemModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-6">
-        <h3 className="mb-4 font-semibold text-gray-900">
-          {initial ? "Rediger vare" : "Ny vare"}
-        </h3>
+        <h3 className="mb-4 font-semibold text-gray-900">{initial ? "Rediger vare" : "Ny vare"}</h3>
         <div className="flex flex-col gap-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Kategori</label>
@@ -139,9 +138,7 @@ function ItemModal({
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none"
             >
               {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
           </div>
@@ -187,10 +184,7 @@ function ItemModal({
           {error && <p className="text-xs text-red-500">{error}</p>}
         </div>
         <div className="mt-6 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-lg border border-gray-200 py-2 text-sm text-gray-600"
-          >
+          <button onClick={onClose} className="flex-1 rounded-lg border border-gray-200 py-2 text-sm text-gray-600">
             Annuller
           </button>
           <button
@@ -206,8 +200,108 @@ function ItemModal({
   );
 }
 
+function CopyMenuModal({
+  restaurantId,
+  otherRestaurants,
+  onClose,
+}: {
+  restaurantId: string;
+  otherRestaurants: { id: string; name: string }[];
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const [sourceId, setSourceId] = useState(otherRestaurants[0]?.id ?? "");
+  const [status, setStatus] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(false);
+
+  async function handleCopy() {
+    if (!sourceId) return;
+    setRunning(true);
+    setStatus("Henter kildemenuen...");
+    try {
+      const res = await apiClient.get<{ success: boolean; data: Category[] }>(`/restaurants/${sourceId}/menu`);
+      const categories: Category[] = res.data.data;
+      let catCount = 0;
+      let itemCount = 0;
+      for (const cat of categories) {
+        setStatus(`Kopierer kategori: ${cat.name}…`);
+        const newCatRes = await menusApi.createCategory(restaurantId, {
+          name: cat.name,
+          description: cat.description ?? undefined,
+        });
+        catCount++;
+        const newCatId = newCatRes.data.data.id;
+        for (const item of cat.menuItems) {
+          await menusApi.createItem(restaurantId, {
+            categoryId: newCatId,
+            name: item.name,
+            description: item.description ?? undefined,
+            price: Number(item.price),
+            isVegetarian: item.isVegetarian,
+            isVegan: item.isVegan,
+          });
+          itemCount++;
+        }
+      }
+      setStatus(`Kopierede ${catCount} kategorier og ${itemCount} varer.`);
+      qc.invalidateQueries({ queryKey: ["menu", restaurantId] });
+      setDone(true);
+    } catch {
+      setStatus("Fejl under kopiering. Prøv igen.");
+      setRunning(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6">
+        <h3 className="mb-1 font-semibold text-gray-900">Kopier menu</h3>
+        <p className="mb-4 text-sm text-gray-500">
+          Kopierer alle kategorier og varer fra den valgte restaurant til denne.
+        </p>
+        {otherRestaurants.length === 0 ? (
+          <p className="text-sm text-gray-400">Ingen andre restauranter at kopiere fra.</p>
+        ) : (
+          <>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Kildrestaurant</label>
+            <select
+              value={sourceId}
+              onChange={(e) => setSourceId(e.target.value)}
+              disabled={running || done}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none"
+            >
+              {otherRestaurants.map((r) => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+            {status && (
+              <p className={`mt-3 text-xs ${done ? "text-green-600" : "text-gray-500"}`}>{status}</p>
+            )}
+          </>
+        )}
+        <div className="mt-4 flex gap-3">
+          <button onClick={onClose} className="flex-1 rounded-lg border border-gray-200 py-2 text-sm text-gray-600">
+            {done ? "Luk" : "Annuller"}
+          </button>
+          {!done && otherRestaurants.length > 0 && (
+            <button
+              onClick={handleCopy}
+              disabled={running || !sourceId}
+              className="flex-1 rounded-lg bg-brand-500 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              {running ? "Kopierer…" : "Kopier"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MenuManagerPage() {
-  const user = useAuthStore((s) => s.user);
+  const { restaurantId } = useParams<{ restaurantId: string }>();
+  const navigate = useNavigate();
   const qc = useQueryClient();
 
   const [categoryModal, setCategoryModal] = useState<
@@ -216,20 +310,17 @@ export default function MenuManagerPage() {
   const [itemModal, setItemModal] = useState<
     | null
     | { mode: "create"; categoryId: string }
-    | {
-        mode: "edit";
-        categoryId: string;
-        item: { id: string; name: string; description: string | null; price: string; isVegetarian: boolean };
-      }
+    | { mode: "edit"; categoryId: string; item: { id: string; name: string; description: string | null; price: string; isVegetarian: boolean } }
   >(null);
+  const [showCopyModal, setShowCopyModal] = useState(false);
 
-  const { data: restaurants } = useQuery({
+  const { data: ownedData } = useQuery({
     queryKey: ["restaurants", "owned"],
     queryFn: () => restaurantsApi.getOwned(),
-    enabled: !!user,
   });
-
-  const restaurantId = restaurants?.data?.data?.[0]?.id;
+  const ownedRestaurants = ownedData?.data?.data ?? [];
+  const isOwned = ownedRestaurants.some((r) => r.id === restaurantId);
+  const otherRestaurants = ownedRestaurants.filter((r) => r.id !== restaurantId);
 
   const { data, isLoading } = useQuery({
     queryKey: ["menu", restaurantId],
@@ -255,20 +346,33 @@ export default function MenuManagerPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["menu", restaurantId] }),
   });
 
-  if (!restaurantId) {
-    return <div className="py-20 text-center text-gray-400">Ingen restaurant fundet</div>;
+  if (!restaurantId) return null;
+
+  if (ownedData && !isOwned) {
+    navigate("/restaurant/dashboard", { replace: true });
+    return null;
   }
 
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Menu</h1>
-        <button
-          onClick={() => setCategoryModal({ mode: "create" })}
-          className="flex items-center gap-2 rounded-lg bg-brand-500 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-600"
-        >
-          <Plus className="h-4 w-4" /> Ny kategori
-        </button>
+        <div className="flex items-center gap-2">
+          {otherRestaurants.length > 0 && (
+            <button
+              onClick={() => setShowCopyModal(true)}
+              className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+              <Copy className="h-4 w-4" /> Kopier menu
+            </button>
+          )}
+          <button
+            onClick={() => setCategoryModal({ mode: "create" })}
+            className="flex items-center gap-2 rounded-lg bg-brand-500 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-600"
+          >
+            <Plus className="h-4 w-4" /> Ny kategori
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -296,9 +400,7 @@ export default function MenuManagerPage() {
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
                   <button
-                    onClick={() => {
-                      if (confirm(`Slet kategorien "${cat.name}"?`)) deleteCategory(cat.id);
-                    }}
+                    onClick={() => { if (confirm(`Slet kategorien "${cat.name}"?`)) deleteCategory(cat.id); }}
                     className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500"
                     title="Slet kategori"
                   >
@@ -318,62 +420,36 @@ export default function MenuManagerPage() {
               ) : (
                 <ul className="flex flex-col gap-2">
                   {cat.menuItems.map((item) => (
-                    <li
-                      key={item.id}
-                      className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3"
-                    >
+                    <li key={item.id} className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
                           <p className="text-sm font-medium text-gray-900">{item.name}</p>
                           {item.isVegetarian && (
-                            <span className="rounded-full bg-green-50 px-1.5 py-0.5 text-[10px] font-semibold text-green-600">
-                              V
-                            </span>
+                            <span className="rounded-full bg-green-50 px-1.5 py-0.5 text-[10px] font-semibold text-green-600">V</span>
+                          )}
+                          {!item.isAvailable && (
+                            <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-400">Utilgængelig</span>
                           )}
                         </div>
                         <p className="text-xs text-gray-400">{Number(item.price).toFixed(0)} kr</p>
                       </div>
                       <div className="flex items-center gap-1 ml-2">
                         <button
-                          onClick={() =>
-                            toggleAvailability({ itemId: item.id, isAvailable: !item.isAvailable })
-                          }
-                          className={`rounded-lg p-1.5 ${
-                            item.isAvailable
-                              ? "text-green-500 hover:bg-green-50"
-                              : "text-gray-400 hover:bg-gray-100"
-                          }`}
+                          onClick={() => toggleAvailability({ itemId: item.id, isAvailable: !item.isAvailable })}
+                          className={`rounded-lg p-1.5 ${item.isAvailable ? "text-green-500 hover:bg-green-50" : "text-gray-400 hover:bg-gray-100"}`}
                           title={item.isAvailable ? "Sæt utilgængelig" : "Sæt tilgængelig"}
                         >
-                          {item.isAvailable ? (
-                            <ToggleRight className="h-4 w-4" />
-                          ) : (
-                            <ToggleLeft className="h-4 w-4" />
-                          )}
+                          {item.isAvailable ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
                         </button>
                         <button
-                          onClick={() =>
-                            setItemModal({
-                              mode: "edit",
-                              categoryId: cat.id,
-                              item: {
-                                id: item.id,
-                                name: item.name,
-                                description: item.description,
-                                price: item.price,
-                                isVegetarian: item.isVegetarian,
-                              },
-                            })
-                          }
+                          onClick={() => setItemModal({ mode: "edit", categoryId: cat.id, item: { id: item.id, name: item.name, description: item.description, price: item.price, isVegetarian: item.isVegetarian } })}
                           className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
                           title="Rediger vare"
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button
-                          onClick={() => {
-                            if (confirm(`Slet "${item.name}"?`)) deleteItem(item.id);
-                          }}
+                          onClick={() => { if (confirm(`Slet "${item.name}"?`)) deleteItem(item.id); }}
                           className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500"
                           title="Slet vare"
                         >
@@ -404,6 +480,14 @@ export default function MenuManagerPage() {
           initial={itemModal.mode === "edit" ? itemModal.item : undefined}
           categories={categories}
           onClose={() => setItemModal(null)}
+        />
+      )}
+
+      {showCopyModal && (
+        <CopyMenuModal
+          restaurantId={restaurantId}
+          otherRestaurants={otherRestaurants}
+          onClose={() => setShowCopyModal(false)}
         />
       )}
     </div>

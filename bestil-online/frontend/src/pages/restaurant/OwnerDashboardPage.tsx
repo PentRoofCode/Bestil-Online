@@ -56,13 +56,13 @@ export default function OwnerDashboardPage() {
               </div>
               <div className="mt-4 flex gap-2">
                 <Link
-                  to="/restaurant/orders"
+                  to={`/restaurant/${r.id}/orders`}
                   className="flex-1 rounded-lg border border-gray-200 py-1.5 text-center text-xs font-medium text-gray-600 hover:bg-gray-50"
                 >
                   Ordrer
                 </Link>
                 <Link
-                  to="/restaurant/menu"
+                  to={`/restaurant/${r.id}/menu`}
                   className="flex-1 rounded-lg border border-gray-200 py-1.5 text-center text-xs font-medium text-gray-600 hover:bg-gray-50"
                 >
                   Menu

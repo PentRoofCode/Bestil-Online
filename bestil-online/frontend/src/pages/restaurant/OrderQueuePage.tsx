@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { restaurantsApi } from "@/api/restaurants.api";
+import { useParams } from "react-router-dom";
 import { ordersApi } from "@/api/orders.api";
-import { useAuthStore } from "@/stores/authStore";
 import { Clock } from "lucide-react";
 
 const NEXT_STATUS: Record<string, string | null> = {
@@ -25,16 +24,8 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function OrderQueuePage() {
-  const user = useAuthStore((s) => s.user);
+  const { restaurantId } = useParams<{ restaurantId: string }>();
   const qc = useQueryClient();
-
-  const { data: restaurants } = useQuery({
-    queryKey: ["restaurants", "owned"],
-    queryFn: () => restaurantsApi.getOwned(),
-    enabled: !!user,
-  });
-
-  const restaurantId = restaurants?.data?.data?.[0]?.id;
 
   const { data, isLoading } = useQuery({
     queryKey: ["restaurant-orders", restaurantId],
