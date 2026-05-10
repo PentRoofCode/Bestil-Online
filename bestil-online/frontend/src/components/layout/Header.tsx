@@ -2,6 +2,7 @@ import { ShoppingBag, ShoppingCart, LogOut, User } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { useCartStore } from "@/stores/cartStore";
+import { useQueryClient } from "@tanstack/react-query";
 import { authApi } from "@/api/auth.api";
 
 export default function Header() {
@@ -9,14 +10,13 @@ export default function Header() {
   const logout = useAuthStore((s) => s.logout);
   const totalItems = useCartStore((s) => s.totalItems());
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   async function handleLogout() {
-    try {
-      await authApi.logout();
-    } finally {
-      logout();
-      navigate("/login");
-    }
+    try { await authApi.logout(); } catch { /* ignore */ }
+    logout();
+    queryClient.clear();
+    navigate("/login");
   }
 
   return (

@@ -33,10 +33,10 @@ export default function LoginPage() {
     onSuccess: (res) => {
       const { accessToken, user } = res.data.data;
       setAuth(user, accessToken);
-      const redirect = params.get("redirect");
-      if (redirect) { navigate(redirect); return; }
       if (user.role === "ADMIN" || user.role === "SUPER_ADMIN") { navigate("/admin/dashboard"); return; }
-      navigate("/");
+      if (user.role === "RESTAURANT_OWNER") { navigate("/restaurant/dashboard"); return; }
+      const redirect = params.get("redirect");
+      navigate(redirect ?? "/");
     },
     onError: () => {
       setError("password", { message: "Forkert email eller adgangskode" });

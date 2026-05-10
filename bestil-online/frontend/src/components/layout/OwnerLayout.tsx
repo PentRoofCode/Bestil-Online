@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useParams, Link, useNavigate } from "react-router-dom";
 import { LayoutDashboard, UtensilsCrossed, ClipboardList, Settings, ChevronLeft, ShoppingCart, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { restaurantsApi } from "@/api/restaurants.api";
 import { useAuthStore } from "@/stores/authStore";
 import { authApi } from "@/api/auth.api";
@@ -10,6 +10,7 @@ export default function OwnerLayout() {
   const { restaurantId } = useParams<{ restaurantId?: string }>();
   const navigate = useNavigate();
   const logoutStore = useAuthStore((s) => s.logout);
+  const queryClient = useQueryClient();
 
   const { data } = useQuery({
     queryKey: ["restaurants", "owned"],
@@ -21,6 +22,7 @@ export default function OwnerLayout() {
   async function handleLogout() {
     try { await authApi.logout(); } catch { /* ignore */ }
     logoutStore();
+    queryClient.clear();
     navigate("/login");
   }
 
