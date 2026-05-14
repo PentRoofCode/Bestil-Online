@@ -7,6 +7,7 @@ import { useMutation } from "@tanstack/react-query";
 import { ShoppingBag, Eye, EyeOff } from "lucide-react";
 import { authApi } from "@/api/auth.api";
 import { useAuthStore } from "@/stores/authStore";
+import { useCartStore } from "@/stores/cartStore";
 
 const schema = z.object({
   email: z.string().email("Ugyldig email"),
@@ -32,6 +33,10 @@ export default function LoginPage() {
     mutationFn: (data: FormData) => authApi.login(data),
     onSuccess: (res) => {
       const { accessToken, user } = res.data.data;
+      const prevUser = useAuthStore.getState().user;
+      if (!prevUser || prevUser.id !== user.id) {
+        useCartStore.getState().clear();
+      }
       setAuth(user, accessToken);
       if (user.role === "ADMIN" || user.role === "SUPER_ADMIN") { navigate("/admin/dashboard"); return; }
       if (user.role === "RESTAURANT_OWNER") { navigate("/restaurant/dashboard"); return; }

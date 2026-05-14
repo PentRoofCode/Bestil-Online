@@ -7,13 +7,13 @@ import { useMutation } from "@tanstack/react-query";
 import { ShoppingBag, Eye, EyeOff } from "lucide-react";
 import { authApi } from "@/api/auth.api";
 import { useAuthStore } from "@/stores/authStore";
+import { useCartStore } from "@/stores/cartStore";
 
 const schema = z.object({
   firstName: z.string().min(1, "Påkrævet"),
   lastName: z.string().min(1, "Påkrævet"),
   email: z.string().email("Ugyldig email"),
   password: z.string().min(8, "Mindst 8 tegn"),
-  role: z.enum(["CUSTOMER", "RESTAURANT_OWNER"]),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -28,15 +28,16 @@ export default function RegisterPage() {
     handleSubmit,
     formState: { errors },
     setError,
-  } = useForm<FormData>({ resolver: zodResolver(schema), defaultValues: { role: "CUSTOMER" } });
+  } = useForm<FormData>({ resolver: zodResolver(schema) });
 
   const { mutate, isPending } = useMutation({
     mutationFn: async (data: FormData) => {
-      await authApi.register(data);
+      await authApi.register({ ...data, role: "CUSTOMER" });
       return authApi.login({ email: data.email, password: data.password });
     },
     onSuccess: (res) => {
       const { accessToken, user } = res.data.data;
+      useCartStore.getState().clear();
       setAuth(user, accessToken);
       navigate("/");
     },
@@ -105,17 +106,6 @@ export default function RegisterPage() {
                 </button>
               </div>
               {errors.password && <p className="mt-1 text-xs text-red-500">{errors.password.message}</p>}
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Kontoetype</label>
-              <select
-                {...register("role")}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand-400 focus:outline-none"
-              >
-                <option value="CUSTOMER">Kunde</option>
-                <option value="RESTAURANT_OWNER">Restaurantejer</option>
-              </select>
             </div>
 
             <button

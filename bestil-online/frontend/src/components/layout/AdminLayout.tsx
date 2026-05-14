@@ -1,6 +1,7 @@
 import { NavLink, Outlet, Link, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Store, ShoppingBag, Users, BarChart3, ShoppingCart, LogOut, ExternalLink, MessageSquare } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
+import { useCartStore } from "@/stores/cartStore";
 import { useQueryClient } from "@tanstack/react-query";
 import { authApi } from "@/api/auth.api";
 
@@ -16,10 +17,12 @@ const NAV = [
 export default function AdminLayout() {
   const navigate = useNavigate();
   const logoutStore = useAuthStore((s) => s.logout);
+  const clearCart = useCartStore((s) => s.clear);
   const queryClient = useQueryClient();
 
   async function handleLogout() {
     try { await authApi.logout(); } catch { /* ignore */ }
+    clearCart();
     logoutStore();
     queryClient.clear();
     navigate("/login");

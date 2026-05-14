@@ -3,7 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { MapPin, ArrowLeft } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js";
-import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import {
+  CheckoutElementsProvider,
+  useCheckoutElements,
+  PaymentElement,
+} from "@stripe/react-stripe-js/checkout";
 import { addressesApi } from "@/api/addresses.api";
 import { ordersApi } from "@/api/orders.api";
 import { useCartStore } from "@/stores/cartStore";
@@ -30,6 +34,11 @@ function Step1({ onProceed }: { onProceed: (s: Session) => void }) {
   const addresses = addressesData?.data?.data ?? [];
   const activeAddress =
     selectedAddressId ?? addresses.find((a) => a.isDefault)?.id ?? addresses[0]?.id ?? null;
+
+  const PEEK_COUNT = 2;
+  const [addressesExpanded, setAddressesExpanded] = useState(false);
+  const showAllAddresses = addressesExpanded || addresses.length <= PEEK_COUNT;
+  const visibleAddresses = showAllAddresses ? addresses : addresses.slice(0, PEEK_COUNT);
 
   const sub = subtotal();
   const tax = sub * 0.25;
@@ -103,32 +112,55 @@ function Step1({ onProceed }: { onProceed: (s: Session) => void }) {
                 </button>
               </p>
             ) : (
-              <div className="flex flex-col gap-2">
-                {addresses.map((a) => (
-                  <label
-                    key={a.id}
-                    className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${
-                      activeAddress === a.id
-                        ? "border-brand-400 bg-brand-50/40"
-                        : "border-gray-100 hover:border-brand-200"
-                    }`}
+              <div>
+                <div className="relative">
+                  <div className="flex flex-col gap-2">
+                    {visibleAddresses.map((a) => (
+                      <label
+                        key={a.id}
+                        className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${
+                          activeAddress === a.id
+                            ? "border-brand-400 bg-brand-50/40"
+                            : "border-gray-100 hover:border-brand-200"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="address"
+                          value={a.id}
+                          checked={activeAddress === a.id}
+                          onChange={() => { setSelectedAddressId(a.id); setAddressesExpanded(false); }}
+                          className="mt-0.5 accent-brand-500"
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{a.label}</p>
+                          <p className="text-xs text-gray-500">
+                            {a.street}, {a.postalCode} {a.city}
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  {!showAllAddresses && (
+                    <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white to-transparent" />
+                  )}
+                </div>
+                {!showAllAddresses && (
+                  <button
+                    onClick={() => setAddressesExpanded(true)}
+                    className="mt-1 w-full py-1.5 text-center text-sm text-brand-500 hover:underline"
                   >
-                    <input
-                      type="radio"
-                      name="address"
-                      value={a.id}
-                      checked={activeAddress === a.id}
-                      onChange={() => setSelectedAddressId(a.id)}
-                      className="mt-0.5 accent-brand-500"
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{a.label}</p>
-                      <p className="text-xs text-gray-500">
-                        {a.street}, {a.postalCode} {a.city}
-                      </p>
-                    </div>
-                  </label>
-                ))}
+                    Vis {addresses.length - PEEK_COUNT} mere
+                  </button>
+                )}
+                {showAllAddresses && addresses.length > PEEK_COUNT && (
+                  <button
+                    onClick={() => setAddressesExpanded(false)}
+                    className="mt-2 w-full py-1 text-center text-sm text-gray-400 hover:text-gray-600"
+                  >
+                    Vis færre
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -199,36 +231,34 @@ function Step1({ onProceed }: { onProceed: (s: Session) => void }) {
 
 // ── Step 2: Payment methods ───────────────────────────────────────────────────
 
-function Step2({ orderId, total, onBack }: { orderId: string; total: number; onBack: () => void }) {
+function PaymentForm({ orderId, total, onBack }: { orderId: string; total: number; onBack: () => void }) {
   const navigate = useNavigate();
-  const stripe = useStripe();
-  const elements = useElements();
+  const checkoutState = useCheckoutElements();
   const { clear } = useCartStore();
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
   async function handlePay() {
-    if (!stripe || !elements) return;
+    if (checkoutState.type !== "success") return;
     setError(null);
     setIsPending(true);
 
-    const { error: stripeError } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: `${window.location.origin}/orders/${orderId}`,
-      },
-      redirect: "if_required",
-    });
+    try {
+      const result = await checkoutState.checkout.confirm({ redirect: "if_required" });
 
-    if (stripeError) {
-      setError(stripeError.message ?? "Betaling fejlede. Prøv igen.");
+      if (result.type === "error") {
+        setError(result.error.message ?? "Betaling fejlede. Prøv igen.");
+        setIsPending(false);
+        return;
+      }
+
+      clear();
+      navigate(`/orders/${orderId}`);
+    } catch {
+      setError("Der opstod en uventet fejl. Prøv igen.");
       setIsPending(false);
-      return;
     }
-
-    clear();
-    navigate(`/orders/${orderId}`);
   }
 
   async function handleBack() {
@@ -236,6 +266,8 @@ function Step2({ orderId, total, onBack }: { orderId: string; total: number; onB
     try { await ordersApi.cancel(orderId, "Kunden gik tilbage fra betaling"); } catch { /* order may already be gone */ }
     onBack();
   }
+
+  const isLoading = checkoutState.type === "loading";
 
   return (
     <div className="mx-auto max-w-lg px-4 py-10 sm:px-6">
@@ -264,7 +296,7 @@ function Step2({ orderId, total, onBack }: { orderId: string; total: number; onB
 
         <button
           onClick={handlePay}
-          disabled={isPending || !stripe}
+          disabled={isPending || isLoading}
           className="mt-5 w-full rounded-xl bg-brand-500 py-3 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
         >
           {isPending ? "Behandler betaling..." : `Betal ${total.toFixed(0)} kr`}
@@ -284,22 +316,23 @@ export default function CheckoutPage() {
   }
 
   return (
-    <Elements
+    <CheckoutElementsProvider
       stripe={stripePromise}
       options={{
         clientSecret: session.clientSecret,
-        locale: "da",
-        appearance: {
-          theme: "stripe",
-          variables: {
-            colorPrimary: "#f97316",
-            borderRadius: "12px",
-            fontFamily: "inherit",
+        elementsOptions: {
+          appearance: {
+            theme: "stripe",
+            variables: {
+              colorPrimary: "#f97316",
+              borderRadius: "12px",
+              fontFamily: "inherit",
+            },
           },
         },
       }}
     >
-      <Step2 orderId={session.orderId} total={session.total} onBack={() => setSession(null)} />
-    </Elements>
+      <PaymentForm orderId={session.orderId} total={session.total} onBack={() => setSession(null)} />
+    </CheckoutElementsProvider>
   );
 }

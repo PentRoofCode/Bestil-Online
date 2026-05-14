@@ -18,12 +18,12 @@ const authRateLimit = rateLimitByIp(5, 60);
 router.post("/register", authRateLimit, validate(registerSchema), authController.register);
 router.post("/login", authRateLimit, validate(loginSchema), authController.login);
 router.post("/logout", authenticate, authController.logout);
-router.post("/refresh", authController.refresh);
+router.post("/refresh", authRateLimit, authController.refresh);
 router.get("/me", authenticate, authController.me);
 
 router.get("/verify-email", authController.verifyEmail);
 router.post("/forgot-password", authRateLimit, validate(forgotPasswordSchema), authController.forgotPassword);
-router.post("/reset-password", validate(resetPasswordSchema), authController.resetPassword);
+router.post("/reset-password", authRateLimit, validate(resetPasswordSchema), authController.resetPassword);
 router.post("/change-password", authenticate, validate(changePasswordSchema), authController.changePassword);
 
 export default router;

@@ -38,7 +38,9 @@ export const menusService = {
       where: { id: restaurantId },
       select: { isActive: true, isVerified: true },
     });
-    if (!restaurant) throw ApiError.notFound("Restaurant not found");
+    if (!restaurant || !restaurant.isActive || !restaurant.isVerified) {
+      throw ApiError.notFound("Restaurant not found");
+    }
 
     const categories = await prisma.menuCategory.findMany({
       where: { restaurantId, isActive: true },
@@ -59,6 +61,26 @@ export const menusService = {
 
     await redis.set(menuKey(restaurantId), JSON.stringify(categories), "EX", MENU_TTL);
     return categories;
+  },
+
+  async getFullMenuForOwner(restaurantId: string, userId: string, role: string) {
+    await assertOwnership(restaurantId, userId, role);
+
+    return prisma.menuCategory.findMany({
+      where: { restaurantId },
+      orderBy: { displayOrder: "asc" },
+      include: {
+        menuItems: {
+          orderBy: { displayOrder: "asc" },
+          include: {
+            optionGroups: {
+              orderBy: { displayOrder: "asc" },
+              include: { options: { orderBy: { displayOrder: "asc" } } },
+            },
+          },
+        },
+      },
+    });
   },
 
   async createCategory(restaurantId: string, userId: string, role: string, data: CreateCategoryBody) {

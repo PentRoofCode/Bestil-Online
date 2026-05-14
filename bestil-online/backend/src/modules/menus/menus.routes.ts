@@ -17,6 +17,7 @@ const router = Router({ mergeParams: true });
 const ownerAuth = [authenticate, requireRole("RESTAURANT_OWNER", "ADMIN", "SUPER_ADMIN")];
 
 router.get("/", menusController.getMenu);
+router.get("/manage", ...ownerAuth, menusController.getMenuForOwner);
 router.post("/categories", ...ownerAuth, validate(createCategorySchema), menusController.createCategory);
 router.patch("/categories/:id", ...ownerAuth, validate(updateCategorySchema), menusController.updateCategory);
 router.delete("/categories/:id", ...ownerAuth, menusController.deleteCategory);

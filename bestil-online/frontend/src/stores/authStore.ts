@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useCartStore } from "./cartStore";
 
 export interface AuthUser {
   id: string;
@@ -18,11 +19,17 @@ interface AuthState {
   logout: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   accessToken: null,
   isHydrating: true,
-  setAuth: (user, accessToken) => set({ user, accessToken }),
+  setAuth: (user, accessToken) => {
+    const prev = get().user;
+    if (prev && prev.id !== user.id) {
+      useCartStore.getState().clear();
+    }
+    set({ user, accessToken });
+  },
   setAccessToken: (accessToken) => set({ accessToken }),
   setHydrated: () => set({ isHydrating: false }),
   logout: () => set({ user: null, accessToken: null }),

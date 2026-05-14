@@ -1,4 +1,4 @@
-import { ShoppingBag, ShoppingCart, LogOut, User } from "lucide-react";
+import { ShoppingBag, ShoppingCart, LogOut, User, Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { useCartStore } from "@/stores/cartStore";
@@ -9,11 +9,13 @@ export default function Header() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const totalItems = useCartStore((s) => s.totalItems());
+  const clearCart = useCartStore((s) => s.clear);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   async function handleLogout() {
     try { await authApi.logout(); } catch { /* ignore */ }
+    clearCart();
     logout();
     queryClient.clear();
     navigate("/login");
@@ -30,15 +32,27 @@ export default function Header() {
         </Link>
 
         <nav className="flex items-center gap-4 text-sm font-medium">
+          <Link to="/" className="text-gray-600 hover:text-brand-500 transition-colors">
+            Restauranter
+          </Link>
           {user ? (
             <>
               {totalItems > 0 && (
-                <Link to="/checkout" className="relative">
-                  <ShoppingCart className="h-5 w-5 text-gray-600 hover:text-brand-500" />
-                  <span className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-brand-500 text-[10px] text-white">
-                    {totalItems}
-                  </span>
-                </Link>
+                <>
+                  <button
+                    onClick={() => { if (confirm("Ryd kurven?")) clearCart(); }}
+                    className="text-gray-400 hover:text-red-500 transition-colors"
+                    title="Ryd kurv"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                  <Link to="/checkout" className="relative">
+                    <ShoppingCart className="h-5 w-5 text-gray-600 hover:text-brand-500" />
+                    <span className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-brand-500 text-[10px] text-white">
+                      {totalItems}
+                    </span>
+                  </Link>
+                </>
               )}
               <Link to="/orders" className="text-gray-600 hover:text-brand-500">
                 Mine ordrer
@@ -59,6 +73,7 @@ export default function Header() {
               )}
               <button
                 onClick={handleLogout}
+                aria-label="Log ud"
                 className="flex items-center gap-1 text-gray-400 hover:text-red-500"
               >
                 <LogOut className="h-4 w-4" />

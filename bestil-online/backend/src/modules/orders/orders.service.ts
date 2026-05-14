@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import Decimal from "decimal.js";
 import { Prisma, OrderStatus } from "@prisma/client";
 import { prisma } from "@/config/db";
@@ -7,7 +8,10 @@ import { env } from "@/config/env";
 import Stripe from "stripe";
 import type { CreateOrderBody, UpdateStatusBody, ListOrdersQuery } from "./orders.schemas";
 
-const stripe = new Stripe(env.STRIPE_SECRET_KEY, { apiVersion: "2025-02-24.acacia" as const });
+// ui_mode: "elements" requires API version 2026-03-25.dahlia (not yet in SDK types)
+const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
+  apiVersion: "2026-03-25.dahlia" as Stripe.LatestApiVersion,
+});
 
 // Allowed status transitions
 const TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
@@ -40,6 +44,10 @@ export const ordersService = {
     // Validate address belongs to user
     const address = await prisma.address.findFirst({ where: { id: deliveryAddressId, userId } });
     if (!address) throw ApiError.notFound("Delivery address not found");
+
+    // Fetch user email for Stripe customer_email
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+    if (!user) throw ApiError.notFound("User not found");
 
     // Fetch and validate menu items
     const menuItemIds = items.map((i) => i.menuItemId);
@@ -91,17 +99,57 @@ export const ordersService = {
     const totalAmount = subtotal.plus(deliveryFee).plus(tax).toDecimalPlaces(2);
 
     const orderNumber = generateOrderNumber();
+    const orderId = randomUUID();
 
-    // Create Stripe PaymentIntent (amount in øre — smallest DKK unit)
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(totalAmount.toNumber() * 100),
-      currency: env.STRIPE_CURRENCY.toLowerCase(),
-      metadata: { orderNumber },
+    // Build Stripe line items from computed order items
+    const stripeLineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+      ...orderItems.map((item) => ({
+        price_data: {
+          currency: env.STRIPE_CURRENCY.toLowerCase(),
+          product_data: { name: item.menuItemName },
+          unit_amount: Math.round(new Decimal(item.unitPrice.toString()).mul(100).toNumber()),
+        },
+        quantity: item.quantity,
+      })),
+    ];
+    if (deliveryFee.gt(0)) {
+      stripeLineItems.push({
+        price_data: {
+          currency: env.STRIPE_CURRENCY.toLowerCase(),
+          product_data: { name: "Leveringsgebyr" },
+          unit_amount: Math.round(deliveryFee.mul(100).toNumber()),
+        },
+        quantity: 1,
+      });
+    }
+    stripeLineItems.push({
+      price_data: {
+        currency: env.STRIPE_CURRENCY.toLowerCase(),
+        product_data: { name: `Moms (${Math.round(env.VAT_RATE * 100)}%)` },
+        unit_amount: Math.round(tax.mul(100).toNumber()),
+      },
+      quantity: 1,
     });
+
+    // Create Stripe Checkout Session (ui_mode: elements keeps customer on our page)
+    // "elements" is a newer value not yet in SDK types — cast to satisfy TypeScript
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      ui_mode: "elements" as Stripe.Checkout.SessionCreateParams.UiMode,
+      line_items: stripeLineItems,
+      customer_email: user.email,
+      return_url: `${env.FRONTEND_URL}/orders/${orderId}`,
+      metadata: { orderNumber, orderId },
+    });
+
+    if (!session.client_secret) {
+      throw new ApiError(500, "INTERNAL_ERROR", "Failed to create payment session");
+    }
 
     const order = await prisma.$transaction(async (tx) => {
       const newOrder = await tx.order.create({
         data: {
+          id: orderId,
           orderNumber,
           userId,
           restaurantId,
@@ -118,19 +166,20 @@ export const ordersService = {
         include: { items: true },
       });
 
+      // Store session.id temporarily — webhook will update it to the actual PaymentIntent ID
       await tx.payment.create({
         data: {
           orderId: newOrder.id,
           amount: new Prisma.Decimal(totalAmount.toFixed(2)),
           method: "CARD",
-          stripePaymentIntentId: paymentIntent.id,
+          stripePaymentIntentId: session.id,
         },
       });
 
       return newOrder;
     });
 
-    return { order, clientSecret: paymentIntent.client_secret };
+    return { order, clientSecret: session.client_secret };
   },
 
   async listByUser(userId: string, query: ListOrdersQuery) {

@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Copy } from "lucide-react";
 import { restaurantsApi } from "@/api/restaurants.api";
 import { menusApi } from "@/api/menus.api";
-import { apiClient } from "@/api/client";
 
 interface MenuItemData {
   id: string;
@@ -41,7 +40,7 @@ function CategoryModal({
         ? menusApi.updateCategory(restaurantId, initial.id, { name })
         : menusApi.createCategory(restaurantId, { name }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["menu", restaurantId] });
+      qc.invalidateQueries({ queryKey: ["menu", restaurantId, "manage"] });
       onClose();
     },
   });
@@ -119,7 +118,7 @@ function ItemModal({
           });
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["menu", restaurantId] });
+      qc.invalidateQueries({ queryKey: ["menu", restaurantId, "manage"] });
       onClose();
     },
     onError: (e: Error) => setError(e.message),
@@ -220,8 +219,8 @@ function CopyMenuModal({
     setRunning(true);
     setStatus("Henter kildemenuen...");
     try {
-      const res = await apiClient.get<{ success: boolean; data: Category[] }>(`/restaurants/${sourceId}/menu`);
-      const categories: Category[] = res.data.data;
+      const res = await menusApi.getOwnerMenu(sourceId);
+      const categories: Category[] = res.data.data as Category[];
       let catCount = 0;
       let itemCount = 0;
       for (const cat of categories) {
@@ -245,7 +244,7 @@ function CopyMenuModal({
         }
       }
       setStatus(`Kopierede ${catCount} kategorier og ${itemCount} varer.`);
-      qc.invalidateQueries({ queryKey: ["menu", restaurantId] });
+      qc.invalidateQueries({ queryKey: ["menu", restaurantId, "manage"] });
       setDone(true);
     } catch {
       setStatus("Fejl under kopiering. Prøv igen.");
@@ -322,28 +321,29 @@ export default function MenuManagerPage() {
   const isOwned = ownedRestaurants.some((r) => r.id === restaurantId);
   const otherRestaurants = ownedRestaurants.filter((r) => r.id !== restaurantId);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["menu", restaurantId],
-    queryFn: () => apiClient.get(`/restaurants/${restaurantId}/menu`),
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["menu", restaurantId, "manage"],
+    queryFn: () => menusApi.getOwnerMenu(restaurantId!),
     enabled: !!restaurantId,
+    retry: false,
   });
 
   const categories = (data?.data?.data ?? []) as Category[];
 
   const { mutate: deleteCategory } = useMutation({
     mutationFn: (catId: string) => menusApi.deleteCategory(restaurantId!, catId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["menu", restaurantId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["menu", restaurantId, "manage"] }),
   });
 
   const { mutate: deleteItem } = useMutation({
     mutationFn: (itemId: string) => menusApi.deleteItem(restaurantId!, itemId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["menu", restaurantId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["menu", restaurantId, "manage"] }),
   });
 
   const { mutate: toggleAvailability } = useMutation({
     mutationFn: ({ itemId, isAvailable }: { itemId: string; isAvailable: boolean }) =>
       menusApi.setAvailability(restaurantId!, itemId, isAvailable),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["menu", restaurantId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["menu", restaurantId, "manage"] }),
   });
 
   if (!restaurantId) return null;
@@ -351,6 +351,24 @@ export default function MenuManagerPage() {
   if (ownedData && !isOwned) {
     navigate("/restaurant/dashboard", { replace: true });
     return null;
+  }
+
+  if (isError) {
+    const axiosErr = error as { response?: { status?: number; data?: { error?: { code?: string; message?: string } } }; message?: string };
+    const status = axiosErr.response?.status;
+    const errMsg = axiosErr.response?.data?.error?.message ?? axiosErr.message ?? "Netværksfejl — kan backend nås?";
+    const errCode = axiosErr.response?.data?.error?.code;
+    return (
+      <div className="rounded-2xl border border-red-100 bg-red-50 p-6 text-sm text-red-600">
+        <p className="font-semibold">Fejl ved indlæsning af menu</p>
+        <p className="mt-1 text-red-500">{errMsg}</p>
+        {(status || errCode) && (
+          <p className="mt-1 text-xs text-red-400">
+            {status && `HTTP ${status}`}{status && errCode && " · "}{errCode}
+          </p>
+        )}
+      </div>
+    );
   }
 
   return (

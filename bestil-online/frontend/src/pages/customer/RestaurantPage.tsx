@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Star, Clock, Bike, ShoppingCart, Plus } from "lucide-react";
+import { Star, Clock, Bike, ShoppingCart, Plus, Trash2 } from "lucide-react";
 import { restaurantsApi } from "@/api/restaurants.api";
 import { reviewsApi } from "@/api/reviews.api";
 import { useCartStore } from "@/stores/cartStore";
@@ -24,6 +24,7 @@ function ItemModal({
   const addItem = useCartStore((s) => s.addItem);
   const clear = useCartStore((s) => s.clear);
   const cartRestaurantId = useCartStore((s) => s.restaurantId);
+  const cartRestaurantName = useCartStore((s) => s.restaurantName);
   const [qty, setQty] = useState(1);
   const [selections, setSelections] = useState<Record<string, string | string[]>>({});
   const [confirmSwitch, setConfirmSwitch] = useState(false);
@@ -86,18 +87,24 @@ function ItemModal({
 
   if (confirmSwitch) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div
+        role="dialog"
+        aria-labelledby="cart-conflict-title"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+      >
         <div className="w-full max-w-sm rounded-2xl bg-white p-6">
-          <h3 className="font-semibold text-gray-900">Start ny ordre?</h3>
+          <h3 id="cart-conflict-title" className="font-semibold text-gray-900">
+            Start ny ordre?
+          </h3>
           <p className="mt-2 text-sm text-gray-500">
-            Din kurv indeholder varer fra en anden restaurant. Vil du rydde kurven og starte forfra?
+            Din kurv indeholder varer fra <span className="font-medium text-gray-700">{cartRestaurantName}</span>. Vil du rydde kurven og tilføje denne vare fra <span className="font-medium text-gray-700">{restaurantName}</span> i stedet?
           </p>
           <div className="mt-4 flex gap-3">
             <button
               onClick={() => setConfirmSwitch(false)}
               className="flex-1 rounded-lg border border-gray-200 py-2 text-sm"
             >
-              Annuller
+              Annullér
             </button>
             <button
               onClick={() => {
@@ -106,7 +113,7 @@ function ItemModal({
               }}
               className="flex-1 rounded-lg bg-brand-500 py-2 text-sm font-semibold text-white"
             >
-              Ryd og tilføj
+              Ryd kurv og tilføj
             </button>
           </div>
         </div>
@@ -219,6 +226,7 @@ export default function RestaurantPage() {
   const [cartOpen, setCartOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const totalItems = useCartStore((s) => s.totalItems());
+  const clearCart = useCartStore((s) => s.clear);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["restaurant", slug],
@@ -261,18 +269,33 @@ export default function RestaurantPage() {
             </div>
           </div>
           {totalItems > 0 && (
-            <button
-              onClick={() => setCartOpen(true)}
-              className="flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
-            >
-              <ShoppingCart className="h-4 w-4" />
-              Se kurv ({totalItems})
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => { if (confirm("Ryd kurven?")) clearCart(); }}
+                className="flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-500 hover:border-red-200 hover:text-red-500 transition-colors"
+                title="Ryd kurv"
+              >
+                <Trash2 className="h-4 w-4" />
+                Ryd
+              </button>
+              <button
+                onClick={() => setCartOpen(true)}
+                className="flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
+              >
+                <ShoppingCart className="h-4 w-4" />
+                Se kurv ({totalItems})
+              </button>
+            </div>
           )}
         </div>
 
         {/* Menu */}
         <div className="pb-6">
+          {restaurant.categories.length === 0 && (
+            <div className="py-16 text-center text-gray-400">
+              <p>Ingen menuvarer tilgængelige lige nu.</p>
+            </div>
+          )}
           {restaurant.categories.map((cat) => (
             <div key={cat.id} className="mb-10">
               <h2 className="mb-4 text-lg font-bold text-gray-900">{cat.name}</h2>

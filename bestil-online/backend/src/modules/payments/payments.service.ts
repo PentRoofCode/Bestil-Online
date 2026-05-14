@@ -5,7 +5,9 @@ import { env } from "@/config/env";
 import { logger } from "@/utils/logger";
 import { ApiError } from "@/utils/ApiError";
 
-const stripe = new Stripe(env.STRIPE_SECRET_KEY, { apiVersion: "2025-02-24.acacia" as const });
+const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
+  apiVersion: "2026-03-25.dahlia" as Stripe.LatestApiVersion,
+});
 
 export const paymentsService = {
   async handleWebhook(rawBody: Buffer, signature: string) {
@@ -16,45 +18,52 @@ export const paymentsService = {
       throw ApiError.badRequest("Webhook signature verification failed");
     }
 
-    const pi = event.data.object as Stripe.PaymentIntent;
-
-    if (event.type === "payment_intent.succeeded") {
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object as Stripe.Checkout.Session;
+      // We stored session.id in stripePaymentIntentId at order creation
       const payment = await prisma.payment.findUnique({
-        where: { stripePaymentIntentId: pi.id },
+        where: { stripePaymentIntentId: session.id },
         include: { order: true },
       });
       if (!payment) {
-        logger.warn({ piId: pi.id }, "Webhook: payment not found");
+        logger.warn({ sessionId: session.id }, "Webhook: payment not found");
         return;
       }
       if (payment.status === "COMPLETED") return; // idempotent
 
+      // Update stripePaymentIntentId to the actual PaymentIntent ID so refunds work
+      const paymentIntentId = typeof session.payment_intent === "string"
+        ? session.payment_intent
+        : session.payment_intent?.id ?? null;
+
       await prisma.$transaction([
         prisma.payment.update({
           where: { id: payment.id },
-          data: { status: "COMPLETED", completedAt: new Date(), stripeChargeId: pi.latest_charge as string },
+          data: {
+            status: "COMPLETED",
+            completedAt: new Date(),
+            ...(paymentIntentId && { stripePaymentIntentId: paymentIntentId }),
+          },
         }),
         prisma.order.update({
           where: { id: payment.orderId },
           data: { status: "PENDING_CONFIRMATION" },
         }),
       ]);
-      logger.info({ orderId: payment.orderId }, "Payment succeeded, order pending confirmation");
+      logger.info({ orderId: payment.orderId }, "Checkout session completed, order pending confirmation");
     }
 
-    if (event.type === "payment_intent.payment_failed") {
+    if (event.type === "checkout.session.async_payment_failed") {
+      const session = event.data.object as Stripe.Checkout.Session;
       const payment = await prisma.payment.findUnique({
-        where: { stripePaymentIntentId: pi.id },
+        where: { stripePaymentIntentId: session.id },
       });
       if (!payment || payment.status === "FAILED") return;
 
       await prisma.$transaction([
         prisma.payment.update({
           where: { id: payment.id },
-          data: {
-            status: "FAILED",
-            failureReason: pi.last_payment_error?.message ?? "Payment failed",
-          },
+          data: { status: "FAILED", failureReason: "Payment failed" },
         }),
         prisma.order.update({ where: { id: payment.orderId }, data: { status: "PAYMENT_FAILED" } }),
       ]);

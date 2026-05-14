@@ -5,6 +5,8 @@
 #   docker compose up -d        # Start
 #   docker compose down         # Stop (keep data)
 #   docker compose down -v      # Stop and wipe volumes (destructive)
+#
+# Secrets: copy .env.example to .env and fill in real values before running.
 
 services:
   postgres:
@@ -12,18 +14,20 @@ services:
     container_name: bestil-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      # Bind to localhost only — prevents exposure on LAN/cloud interfaces
+      - "127.0.0.1:5432:5432"
     environment:
-      POSTGRES_USER: bestil
-      POSTGRES_PASSWORD: bestil
-      POSTGRES_DB: bestil_dev
-      # Speed up local dev a touch — fine for dev, never for prod
-      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_USER: ${POSTGRES_USER:-bestil}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env.docker}
+      POSTGRES_DB: ${POSTGRES_DB:-bestil_dev}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - bestil-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bestil -d bestil_dev"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bestil} -d ${POSTGRES_DB:-bestil_dev}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -34,15 +38,27 @@ services:
     container_name: bestil-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
-    command: ["redis-server", "--appendonly", "yes"]
+      # Bind to localhost only
+      - "127.0.0.1:6379:6379"
+    command:
+      - redis-server
+      - --appendonly yes
+      - --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env.docker}
+      - --bind 0.0.0.0
+      - --protected-mode yes
     volumes:
       - redis_data:/data
+    networks:
+      - bestil-net
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
+
+networks:
+  bestil-net:
+    driver: bridge
 
 volumes:
   postgres_data:

@@ -6,6 +6,9 @@ interface ApiResponse<T> {
 }
 
 export const menusApi = {
+  getOwnerMenu: (restaurantId: string) =>
+    apiClient.get<ApiResponse<unknown[]>>(`/restaurants/${restaurantId}/menu/manage`),
+
   createCategory: (restaurantId: string, data: { name: string; description?: string }) =>
     apiClient.post<ApiResponse<{ id: string; name: string }>>(`/restaurants/${restaurantId}/menu/categories`, data),
 

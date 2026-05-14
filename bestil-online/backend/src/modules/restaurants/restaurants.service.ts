@@ -48,6 +48,8 @@ export const restaurantsService = {
           deliveryTimeMin: true,
           deliveryFee: true,
           minimumOrderAmount: true,
+          isActive: true,
+          isVerified: true,
         },
       }),
       prisma.restaurant.count({ where }),

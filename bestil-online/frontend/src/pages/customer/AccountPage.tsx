@@ -1,10 +1,98 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { User, MapPin, Lock, Plus, Trash2 } from "lucide-react";
 import { usersApi } from "@/api/users.api";
 import { addressesApi } from "@/api/addresses.api";
 import { apiClient } from "@/api/client";
 import { useAuthStore } from "@/stores/authStore";
+
+interface DawaResult {
+  tekst: string;
+  data: {
+    vejnavn: string;
+    husnr: string;
+    postnr: string;
+    postnrnavn: string;
+  };
+}
+
+function AddressAutocomplete({
+  value,
+  onChange,
+  onSelect,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onSelect: (street: string, city: string, postalCode: string) => void;
+}) {
+  const [suggestions, setSuggestions] = useState<DawaResult[]>([]);
+  const [open, setOpen] = useState(false);
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function handleInput(v: string) {
+    onChange(v);
+    if (debounce.current) clearTimeout(debounce.current);
+    if (!v.trim()) { setSuggestions([]); setOpen(false); return; }
+    debounce.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://api.dataforsyningen.dk/autocomplete?q=${encodeURIComponent(v)}&type=adresse&caretpos=${v.length}&fuzzy=`
+        );
+        const data: DawaResult[] = await res.json();
+        setSuggestions(data.slice(0, 6));
+        setOpen(data.length > 0);
+      } catch {
+        setSuggestions([]);
+      }
+    }, 250);
+  }
+
+  function handlePick(item: DawaResult) {
+    const street = `${item.data.vejnavn} ${item.data.husnr}`;
+    onSelect(street, item.data.postnrnavn, item.data.postnr);
+    setSuggestions([]);
+    setOpen(false);
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <input
+        value={value}
+        onChange={(e) => handleInput(e.target.value)}
+        onFocus={() => suggestions.length > 0 && setOpen(true)}
+        placeholder="Søg vejnavn og nummer..."
+        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none"
+        autoComplete="off"
+      />
+      {open && suggestions.length > 0 && (
+        <ul className="absolute left-0 right-0 top-full z-50 mt-1 max-h-52 overflow-auto rounded-xl border border-gray-100 bg-white shadow-lg">
+          {suggestions.map((s, i) => (
+            <li key={i}>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); handlePick(s); }}
+                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-brand-50 hover:text-brand-700"
+              >
+                {s.tekst}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 function ProfileSection() {
   const qc = useQueryClient();
@@ -147,22 +235,43 @@ function AddressesSection() {
 
       {adding && (
         <div className="mt-4 rounded-xl border border-brand-100 bg-brand-50/30 p-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            {[
-              { label: "Label (fx Hjem)", key: "label" as const },
-              { label: "Vejnavn og nummer", key: "street" as const },
-              { label: "By", key: "city" as const },
-              { label: "Postnummer", key: "postalCode" as const },
-            ].map(({ label, key }) => (
-              <div key={key}>
-                <label className="mb-1 block text-xs text-gray-500">{label}</label>
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">Label (fx Hjem)</label>
+              <input
+                value={form.label}
+                onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">Vejnavn og nummer</label>
+              <AddressAutocomplete
+                value={form.street}
+                onChange={(v) => setForm((f) => ({ ...f, street: v }))}
+                onSelect={(street, city, postalCode) =>
+                  setForm((f) => ({ ...f, street, city, postalCode }))
+                }
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs text-gray-500">By</label>
                 <input
-                  value={form[key]}
-                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none"
+                  value={form.city}
+                  onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none"
                 />
               </div>
-            ))}
+              <div>
+                <label className="mb-1 block text-xs text-gray-500">Postnummer</label>
+                <input
+                  value={form.postalCode}
+                  onChange={(e) => setForm((f) => ({ ...f, postalCode: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none"
+                />
+              </div>
+            </div>
           </div>
           <label className="mt-3 flex items-center gap-2 text-sm text-gray-600">
             <input type="checkbox" checked={form.isDefault} onChange={(e) => setForm((f) => ({ ...f, isDefault: e.target.checked }))} className="accent-brand-500" />

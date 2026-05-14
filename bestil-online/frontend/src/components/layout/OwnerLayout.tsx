@@ -4,12 +4,14 @@ import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { restaurantsApi } from "@/api/restaurants.api";
 import { useAuthStore } from "@/stores/authStore";
+import { useCartStore } from "@/stores/cartStore";
 import { authApi } from "@/api/auth.api";
 
 export default function OwnerLayout() {
   const { restaurantId } = useParams<{ restaurantId?: string }>();
   const navigate = useNavigate();
   const logoutStore = useAuthStore((s) => s.logout);
+  const clearCart = useCartStore((s) => s.clear);
   const queryClient = useQueryClient();
 
   const { data } = useQuery({
@@ -21,6 +23,7 @@ export default function OwnerLayout() {
 
   async function handleLogout() {
     try { await authApi.logout(); } catch { /* ignore */ }
+    clearCart();
     logoutStore();
     queryClient.clear();
     navigate("/login");

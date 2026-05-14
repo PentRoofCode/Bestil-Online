@@ -22,6 +22,9 @@
     "db:studio": "pnpm --filter backend prisma studio",
     "db:generate": "pnpm --filter backend prisma generate",
     "stripe:listen": "stripe listen --forward-to http://localhost:4000/api/v1/payments/webhook",
+    "e2e": "pnpm --filter frontend e2e",
+    "e2e:ui": "pnpm --filter frontend e2e:ui",
+    "e2e:install": "pnpm --filter frontend exec playwright install",
     "clean": "pnpm -r exec rm -rf dist build node_modules .turbo && rm -rf node_modules",
     "prepare": "husky"
   },

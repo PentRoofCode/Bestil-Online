@@ -9,6 +9,15 @@ export const menusController = {
     sendSuccess(res, menu);
   }),
 
+  getMenuForOwner: asyncHandler(async (req: Request, res: Response) => {
+    const menu = await menusService.getFullMenuForOwner(
+      req.params.restaurantId as string,
+      req.user!.id,
+      req.user!.role,
+    );
+    sendSuccess(res, menu);
+  }),
+
   createCategory: asyncHandler(async (req: Request, res: Response) => {
     const cat = await menusService.createCategory(
       req.params.restaurantId as string,
