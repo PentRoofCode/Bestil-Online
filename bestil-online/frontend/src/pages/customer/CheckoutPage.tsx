@@ -40,8 +40,9 @@ function Step1({ onProceed }: { onProceed: (s: Session) => void }) {
   const showAllAddresses = addressesExpanded || addresses.length <= PEEK_COUNT;
   const visibleAddresses = showAllAddresses ? addresses : addresses.slice(0, PEEK_COUNT);
 
+  const VAT_RATE = parseFloat(import.meta.env.VITE_VAT_RATE ?? "0.25");
   const sub = subtotal();
-  const tax = sub * 0.25;
+  const tax = sub * VAT_RATE;
   const total = sub + tax;
 
   if (items.length === 0) {

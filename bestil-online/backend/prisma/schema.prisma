@@ -36,6 +36,7 @@ model User {
 
   @@index([email])
   @@index([role])
+  @@index([isActive])
 }
 
 model Address {
@@ -88,7 +89,7 @@ model Restaurant {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  owner      User           @relation("RestaurantOwner", fields: [ownerId], references: [id])
+  owner      User           @relation("RestaurantOwner", fields: [ownerId], references: [id], onDelete: Restrict)
   categories MenuCategory[]
   menuItems  MenuItem[]
   orders     Order[]
@@ -97,6 +98,7 @@ model Restaurant {
   @@index([slug])
   @@index([isActive, isVerified])
   @@index([city])
+  @@index([ownerId])
 }
 
 // ============= MENU =============
@@ -134,7 +136,7 @@ model MenuItem {
   updatedAt          DateTime @updatedAt
 
   restaurant   Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  category     MenuCategory          @relation(fields: [categoryId], references: [id])
+  category     MenuCategory          @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   optionGroups MenuItemOptionGroup[]
   orderItems   OrderItem[]
 
@@ -214,6 +216,7 @@ model Order {
   @@index([restaurantId, status])
   @@index([orderNumber])
   @@index([status])
+  @@index([deliveryAddressId])
 }
 
 model OrderItem {
@@ -264,7 +267,7 @@ model Payment {
   completedAt           DateTime?
   updatedAt             DateTime      @updatedAt
 
-  order Order @relation(fields: [orderId], references: [id])
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([stripePaymentIntentId])
   @@index([status])
@@ -284,9 +287,10 @@ model Review {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  order      Order      @relation(fields: [orderId], references: [id])
-  user       User       @relation(fields: [userId], references: [id])
-  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+  order      Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   @@index([restaurantId, isVisible])
+  @@index([userId])
 }

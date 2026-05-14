@@ -17,6 +17,10 @@ export function sendSuccess<T>(
   statusCode = 200,
   meta?: Meta,
 ): void {
+  if (statusCode === 204) {
+    res.status(204).end();
+    return;
+  }
   res.status(statusCode).json({ success: true, data, ...(meta && { meta }) });
 }
 
