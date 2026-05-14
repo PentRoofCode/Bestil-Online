@@ -34,10 +34,12 @@ router.post(
   validate(addressSchema),
   asyncHandler(async (req, res) => {
     const data = req.body as z.infer<typeof addressSchema>;
-    if (data.isDefault) {
-      await prisma.address.updateMany({ where: { userId: req.user!.id }, data: { isDefault: false } });
-    }
-    const address = await prisma.address.create({ data: { ...data, userId: req.user!.id } });
+    const address = await prisma.$transaction(async (tx) => {
+      if (data.isDefault) {
+        await tx.address.updateMany({ where: { userId: req.user!.id }, data: { isDefault: false } });
+      }
+      return tx.address.create({ data: { ...data, userId: req.user!.id } });
+    });
     sendCreated(res, address);
   }),
 );
@@ -46,11 +48,18 @@ router.patch(
   "/me/addresses/:id",
   validate(addressSchema.partial()),
   asyncHandler(async (req, res) => {
-    const address = await prisma.address.findFirst({ where: { id: req.params.id as string, userId: req.user!.id } });
-    if (!address) {
+    const data = req.body as z.infer<ReturnType<typeof addressSchema.partial>>;
+    const updated = await prisma.$transaction(async (tx) => {
+      const address = await tx.address.findFirst({ where: { id: req.params.id as string, userId: req.user!.id } });
+      if (!address) return null;
+      if (data.isDefault) {
+        await tx.address.updateMany({ where: { userId: req.user!.id }, data: { isDefault: false } });
+      }
+      return tx.address.update({ where: { id: req.params.id as string }, data });
+    });
+    if (!updated) {
       return res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "Address not found" } });
     }
-    const updated = await prisma.address.update({ where: { id: req.params.id as string }, data: req.body });
     sendSuccess(res, updated);
   }),
 );

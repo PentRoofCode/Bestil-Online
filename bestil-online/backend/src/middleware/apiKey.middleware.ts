@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "@/config/env";
@@ -12,7 +13,13 @@ interface JwtPayload {
 export function adminOrApiKey(req: Request, _res: Response, next: NextFunction) {
   const apiKey = req.headers["x-api-key"] as string | undefined;
   if (apiKey) {
-    if (!env.API_KEY || apiKey !== env.API_KEY) {
+    const keyBuf = Buffer.from(apiKey);
+    const envBuf = Buffer.from(env.API_KEY ?? "");
+    const keyInvalid =
+      !env.API_KEY ||
+      keyBuf.length !== envBuf.length ||
+      !timingSafeEqual(keyBuf, envBuf);
+    if (keyInvalid) {
       return next(ApiError.unauthorized("Invalid API key"));
     }
     return next();
