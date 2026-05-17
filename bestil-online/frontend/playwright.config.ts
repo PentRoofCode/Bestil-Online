@@ -1,4 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
+/// <reference types="node" />
+
+declare const process: {
+  env: Record<string, string | undefined>;
+};
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:5173";
 const API_URL = process.env.PLAYWRIGHT_API_URL ?? "http://localhost:4000/api/v1";
