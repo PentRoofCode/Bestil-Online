@@ -37,8 +37,16 @@ function Step1({ onProceed }: { onProceed: (s: Session) => void }) {
 
   const PEEK_COUNT = 2;
   const [addressesExpanded, setAddressesExpanded] = useState(false);
-  const showAllAddresses = addressesExpanded || addresses.length <= PEEK_COUNT;
-  const visibleAddresses = showAllAddresses ? addresses : addresses.slice(0, PEEK_COUNT);
+  // Selected address always floats to the top so it's visible without expanding
+  const sortedAddresses = [...addresses].sort((a, b) => {
+    if (a.id === activeAddress) return -1;
+    if (b.id === activeAddress) return 1;
+    if (a.isDefault) return -1;
+    if (b.isDefault) return 1;
+    return 0;
+  });
+  const showAllAddresses = addressesExpanded || sortedAddresses.length <= PEEK_COUNT;
+  const visibleAddresses = showAllAddresses ? sortedAddresses : sortedAddresses.slice(0, PEEK_COUNT);
 
   const VAT_RATE = parseFloat(import.meta.env.VITE_VAT_RATE ?? "0.25");
   const sub = subtotal();
@@ -151,7 +159,7 @@ function Step1({ onProceed }: { onProceed: (s: Session) => void }) {
                     onClick={() => setAddressesExpanded(true)}
                     className="mt-1 w-full py-1.5 text-center text-sm text-brand-500 hover:underline"
                   >
-                    Vis {addresses.length - PEEK_COUNT} mere
+                    Vis {sortedAddresses.length - PEEK_COUNT} mere
                   </button>
                 )}
                 {showAllAddresses && addresses.length > PEEK_COUNT && (
