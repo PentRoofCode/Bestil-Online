@@ -47,6 +47,9 @@ frontend/e2e/.auth-state.json
 .stylelintcache
 .prettiercache
 
+# Claude Code local settings
+.claude/settings.local.json
+
 # Editor / OS
 .vscode/*
 !.vscode/settings.json
